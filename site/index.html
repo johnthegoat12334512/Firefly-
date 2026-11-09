@@ -1,0 +1,1873 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Firefly</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=JetBrains+Mono:wght@400&display=swap">
+<style>
+/* Layout: one-screen console. Chat on the left, the living graph in the middle, the brain's settings on the right
+   (Team, Skills, JEV, Memory, Models, Tasks). Phones stack graph above tabbed panels. Single dark theme on purpose:
+   an Obsidian-style vault. */
+:root{
+  --bg:#1e1e1e; --panel:#181818; --slab:#252525; --line:#2e2e2e; --line2:#3a3a3a;
+  --ink:#dadada; --mute:#9a9a9a; --faint:#666; --accent:#8b6cef; --glow:#a68af9;
+  --up:#4fbf8b; --down:#e5636f; --warn:#d9a94e;
+  --f-ui:"Inter","Segoe UI",system-ui,sans-serif; --f-mono:"JetBrains Mono",ui-monospace,Menlo,monospace;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--bg);color:var(--ink);font:14px/1.5 var(--f-ui);overflow:hidden;-webkit-font-smoothing:antialiased}
+*{box-sizing:border-box}
+button,input,textarea,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.app{height:100%;display:grid;grid-template-rows:auto 1fr}
+header.top{display:flex;align-items:center;gap:12px;padding-block:9px;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));background:var(--panel);border-bottom:1px solid var(--line);min-width:0}
+.name{font-weight:600;font-size:15px;background:none;border:0;border-bottom:1px dashed transparent;padding:2px 0;min-width:0;width:auto;max-width:42vw}
+.name:hover,.name:focus{border-bottom-color:var(--line2);outline:none}
+.pills{display:flex;gap:8px;margin-left:auto;flex-wrap:wrap}
+.pill{font-size:12px;color:var(--mute);background:var(--slab);border-radius:5px;padding:5px 9px;display:flex;gap:6px;align-items:center;white-space:nowrap;border:0}
+.pill b{color:var(--ink);font-weight:500}
+.dot{width:7px;height:7px;border-radius:50%;background:var(--faint)}.dot.on{background:var(--up)}.dot.warn{background:var(--warn)}
+main{display:grid;grid-template-columns:minmax(290px,360px) minmax(0,1fr) minmax(300px,380px);min-height:0}
+#chat{min-height:0}
+#graph{min-width:0;min-height:0}
+.side{display:flex;flex-direction:column;min-height:0;background:var(--panel);border-left:1px solid var(--line)}
+.tabs{display:flex;gap:2px;padding:8px 10px;border-bottom:1px solid var(--line);overflow-x:auto;scrollbar-width:none}
+.tabs button{flex:none;background:none;border:0;border-radius:5px;padding:6px 8px;font-size:12.5px;color:var(--mute);cursor:pointer}
+.tabs button[aria-selected="true"]{background:var(--slab);color:var(--ink)}
+.view{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:14px;min-height:0}
+.view[hidden]{display:none}
+h3{margin:0 0 6px;font-size:14px;font-weight:600}
+.sec{border-bottom:1px solid var(--line);padding-bottom:14px}
+.sub{font-size:12px;color:var(--faint)}
+.row{display:flex;gap:8px;align-items:flex-start;padding:8px 0;border-top:1px solid var(--line)}
+.row:first-of-type{border-top:0}
+.sw{flex:none;width:12px;height:12px;border-radius:3px;margin-top:4px}
+.grow{flex:1;min-width:0}
+form.f{display:grid;gap:8px;margin-top:8px}
+label{display:grid;gap:3px;font-size:12px;color:var(--mute)}
+input,textarea,select{background:var(--slab);border:1px solid var(--line2);border-radius:6px;padding:7px 9px;font-size:13px;width:100%;min-width:0;color:var(--ink)}
+textarea{resize:vertical;min-height:64px}
+.btn{justify-self:start;border:0;background:var(--accent);color:#fff;border-radius:6px;padding:7px 13px;font-size:13px;font-weight:500;cursor:pointer}
+.btn.ghost{background:none;border:1px solid var(--line2);color:var(--mute);padding:4px 9px;font-size:12px;font-weight:400}
+.btn[disabled]{opacity:.5;cursor:default}
+.chips{display:flex;flex-wrap:wrap;gap:5px}
+.chip{font-size:11.5px;color:var(--mute);background:var(--slab);border-radius:4px;padding:2px 7px}
+.chk{display:flex;gap:6px;align-items:center;font-size:12.5px;color:var(--ink)}
+.chk input{width:auto}
+.bar{height:8px;background:#2c2c2c;border-radius:4px;overflow:hidden;display:flex;margin-top:5px}
+.bar i{display:block;height:100%}
+.grade{display:flex;gap:5px;margin-top:6px;flex-wrap:wrap}
+.grade button{background:none;border:1px solid var(--line2);border-radius:5px;color:var(--mute);padding:3px 8px;font-size:11.5px;cursor:pointer}
+.grade button[aria-pressed="true"]{color:#fff;border-color:transparent}
+details summary{cursor:pointer;color:var(--glow);font-size:12px;margin-top:4px}
+pre.res{white-space:pre-wrap;font:12.5px/1.5 var(--f-ui);color:#cfcfcf;margin:6px 0 0}
+.empty{color:var(--mute);font-size:13px}
+.err{color:var(--down);font-size:12px}
+.mtabs{display:none}
+@media (max-width:1100px){main{grid-template-columns:minmax(280px,340px) minmax(0,1fr)} .side{display:none} .app.side-open .side{display:flex;position:fixed;right:0;top:0;bottom:0;width:min(400px,94vw);z-index:20;box-shadow:-20px 0 40px #000a} #side-btn{display:flex}}
+@media (min-width:1101px){#side-btn{display:none}}
+@media (max-width:760px){
+  body{overflow:auto}.app{height:auto;min-height:100%}
+  main{display:flex;flex-direction:column}
+  #graph{height:46vh;min-height:300px;order:-1}
+  #chat,.side{display:none}
+  .app[data-m="chat"] #chat{display:flex;height:64vh}.app[data-m="side"] .side{display:flex;position:static;width:auto;box-shadow:none;min-height:64vh}
+  .mtabs{display:flex;position:sticky;bottom:0;gap:6px;background:var(--panel);border-top:1px solid var(--line);padding:6px max(16px,env(safe-area-inset-right,0px)) calc(6px + env(safe-area-inset-bottom,0px)) max(16px,env(safe-area-inset-left,0px))}
+  .mtabs button{flex:1;background:var(--slab);border:1px solid var(--line);border-radius:8px;padding:9px;color:var(--mute);font-size:13px}
+  .mtabs button[aria-pressed="true"]{color:var(--ink);border-color:var(--accent)}
+  #side-btn{display:none}
+}
+#toast{position:fixed;left:50%;bottom:24px;transform:translate(-50%,20px);opacity:0;pointer-events:none;background:#262626;border:1px solid var(--line-2,#3a3a3a);border-radius:8px;padding:9px 14px;font-size:13px;color:var(--ink,#dadada);box-shadow:0 8px 24px #0008;transition:.2s;z-index:50;max-width:min(520px,calc(100vw - 32px))}
+.savings{margin-top:10px;padding:10px 12px;border:1px solid var(--line,#2e2e2e);border-radius:10px;font-size:12.5px;color:var(--mute,#9a9a9a)}.savings b{color:var(--glow,#a68af9);font-weight:600}
+#toast.on{opacity:1;transform:translate(-50%,0)}
+.proj{background:var(--slab,#252525);border:1px solid var(--line,#2e2e2e);border-radius:6px;color:var(--ink,#dadada);padding:5px 8px;font:inherit;font-size:12.5px;max-width:180px}
+@media (prefers-reduced-motion:reduce){*{scroll-behavior:auto}}
+
+/* ============ Firefly ============
+   A notes-app workspace, done properly: a ribbon, a sidebar (crew in rank order, then memories), the graph in the
+   middle, the crew channel on the right, a status line. Flat, dark, precise. The graph area is the night sky the
+   crew's charts float in. One accent (violet); each crew member keeps its own colour. */
+:root{
+  --bg:#0e0f12; --p1:#17181b; --p2:#1c1d21; --p3:#232428; --hover:rgba(255,255,255,.055); --sel:rgba(139,124,246,.16);
+  --line:#26282d; --line2:#33363c; --ink:#dcdde0; --mute:#9a9da4; --faint:#6c7078; --accent:#8b7cf6; --glow:#8b7cf6;
+  --up:#5cc98f; --down:#e5636f; --warn:#d9a94e; --slab:#232428; --bk-bg:var(--bg);
+  --f-ui:"Inter",-apple-system,"Segoe UI",system-ui,sans-serif;
+}
+html,body{background:var(--bg)}
+body{margin:0;color:var(--ink);font:13px/1.5 var(--f-ui);overflow:hidden;-webkit-font-smoothing:antialiased}
+::selection{background:rgba(139,124,246,.3)}
+:focus-visible{outline:1.5px solid var(--accent);outline-offset:1px}
+.app{height:100dvh;display:grid;grid-template-rows:40px minmax(0,1fr) 24px;min-width:0}
+main{display:grid;grid-template-columns:44px 248px minmax(0,1fr) 368px;grid-template-rows:minmax(0,1fr);min-height:0;min-width:0;position:relative}
+.rail{grid-column:1;grid-row:1}.explorer{grid-column:2;grid-row:1}#graph{grid-column:3;grid-row:1}#chat{grid-column:4;grid-row:1}
+
+/* title bar */
+header.top{display:flex;align-items:center;gap:12px;padding:0 10px 0 14px;background:var(--p1);border-bottom:1px solid var(--line);min-width:0}
+.brand{display:flex;align-items:center;gap:8px;font-size:13px;font-weight:600;color:var(--ink);white-space:nowrap}
+.brand-mark{display:grid;place-items:center;color:var(--accent)}.brand-mark svg{width:16px;height:16px}
+.brand small{display:none}
+.name{font:13px var(--f-ui);color:var(--mute);background:none;border:0;border-left:1px solid var(--line2);border-radius:0;padding:2px 0 2px 12px;width:160px;max-width:22vw}
+.name:focus{color:var(--ink);outline:none}
+header.top:has(.proj:not([hidden])) .name{display:none}
+.proj{background:var(--p2);border:1px solid var(--line2);border-radius:6px;color:var(--ink);padding:3px 8px;font-size:12.5px;max-width:190px}
+.pills{display:flex;align-items:center;gap:2px;margin-left:auto;flex-wrap:nowrap}
+.pill{display:flex;align-items:center;gap:6px;background:none;border:0;border-radius:6px;padding:4px 9px;font-size:12px;color:var(--mute);white-space:nowrap}
+.pill b{color:var(--ink);font-weight:500}
+button.pill{cursor:pointer}button.pill:hover{background:var(--hover);color:var(--ink)}
+#side-btn{display:flex!important}
+kbd{font:11px var(--f-ui);color:var(--faint);background:var(--p2);border:1px solid var(--line2);border-radius:4px;padding:0 5px}
+.dot{width:6px;height:6px;border-radius:50%;background:var(--faint)}.dot.on{background:var(--up)}.dot.warn{background:var(--warn)}
+
+/* ribbon */
+.rail{display:flex;flex-direction:column;align-items:center;gap:2px;padding:8px 0;background:var(--p1);border-right:1px solid var(--line)}
+.rail button{width:32px;height:32px;display:grid;place-items:center;border:0;border-radius:6px;background:none;color:var(--faint);cursor:pointer}
+.rail svg{width:18px;height:18px}
+.rail button:hover{background:var(--hover);color:var(--ink)}.rail button.active,.rail button[aria-pressed=true]{color:var(--ink)}
+.rail .rail-bottom{margin-top:auto}
+
+/* sidebar: crew in rank order, then memories */
+.explorer{display:flex;flex-direction:column;min-height:0;overflow:hidden;background:var(--p1);border-right:1px solid var(--line);padding:10px 8px}
+.ex-head{display:flex;justify-content:space-between;align-items:center;padding:8px 8px 6px;font-size:11.5px;font-weight:600;color:var(--mute);letter-spacing:.02em}
+.ex-head span{font-weight:400;color:var(--faint)}
+.ex-list{display:flex;flex-direction:column;gap:1px;flex:none;margin-bottom:10px}
+.ex-list.grow{flex:1;min-height:0;overflow:auto;margin-bottom:0}
+.ex-list button{display:flex;align-items:center;gap:8px;width:100%;min-width:0;background:none;border:0;border-radius:5px;padding:5px 8px;text-align:left;font-size:13px;color:var(--ink);cursor:pointer}
+.ex-list button:hover{background:var(--hover)}.ex-list button.selected{background:var(--sel)}
+.ex-list b{font-weight:400;flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ex-list small{color:var(--faint);font-size:11.5px;white-space:nowrap}
+.ex-list i{flex:none;width:8px;height:8px;border-radius:50%}
+.ex-list .rk{flex:none;width:14px;color:var(--faint);font-size:11px;text-align:right;font-variant-numeric:tabular-nums}
+.ex-list i.doc{width:10px;height:12px;border-radius:2px;border:1px solid var(--faint);background:none}
+.ex-list button:hover i.doc{border-color:var(--mute)}
+
+/* the graph */
+#graph{position:relative;min-width:0;min-height:0;overflow:hidden;background:#000}
+.graph-head{display:none}.canvas-corner{display:none}
+.graph-modes{position:absolute;z-index:2;top:12px;right:12px;display:flex;gap:2px;padding:3px;background:var(--p1);border:1px solid var(--line2);border-radius:7px}
+.graph-modes button{background:none;border:0;border-radius:5px;padding:3px 10px;font-size:12px;color:var(--mute);cursor:pointer}
+.graph-modes button:hover{color:var(--ink)}.graph-modes button[aria-pressed=true]{background:var(--p3);color:var(--ink)}
+.graph-foot{position:absolute;z-index:2;left:12px;bottom:12px;display:flex;gap:2px;padding:3px;background:var(--p1);border:1px solid var(--line2);border-radius:7px}
+.graph-foot button{background:none;border:0;border-radius:5px;padding:3px 10px;font-size:12px;color:var(--mute);cursor:pointer}
+.graph-foot button:hover{background:var(--hover);color:var(--ink)}
+#graph .bk-zoom{right:12px;bottom:12px;gap:0;flex-direction:row;padding:3px;background:var(--p1);border:1px solid var(--line2);border-radius:7px}
+#graph .bk-zoom button{width:26px;height:24px;border:0;border-radius:5px;background:none;color:var(--mute);font-size:14px}
+#graph .bk-zoom button:hover{background:var(--hover);color:var(--ink)}
+#graph .bk-tip{background:var(--p2);border:1px solid var(--line2);border-radius:6px;box-shadow:0 8px 24px rgba(0,0,0,.45);color:var(--ink);font-size:12.5px}
+#graph .bk-tip small{color:var(--mute)}
+#graph .bk-note{top:52px;right:12px;bottom:52px;width:min(460px,calc(100% - 24px));background:var(--p1);border:1px solid var(--line2);border-radius:8px;box-shadow:0 18px 50px rgba(0,0,0,.55)}
+#graph .bk-note header{border-color:var(--line)}#graph .bk-note header b{font-weight:600}#graph .bk-note header button{border-color:var(--line2);color:var(--mute);border-radius:5px}
+#graph .bk-nb{color:var(--ink);font-size:14px;line-height:1.7}#graph .bk-nb h1{font-size:20px}#graph .bk-nb h1,#graph .bk-nb h2,#graph .bk-nb h3{font-weight:600;color:#ececee}
+#graph .bk-nb a{color:var(--accent);border-bottom-color:rgba(139,124,246,.4)}#graph .bk-nb code{background:var(--p3)}#graph .bk-nb th,#graph .bk-nb td{border-color:var(--line)}
+
+/* crew channel */
+#chat{display:flex;flex-direction:column;min-width:0;min-height:0;background:var(--p1);border-left:1px solid var(--line);overflow:hidden}
+#chat::before{content:"Crew";display:block;padding:10px 14px;font-size:11.5px;font-weight:600;letter-spacing:.02em;color:var(--mute);border-bottom:1px solid var(--line)}
+#chat .bk-msgs{padding:14px;gap:14px}
+#chat .bk-m{grid-template-columns:10px minmax(0,1fr)!important;gap:9px;font-size:13px}
+#chat .bk-m i{width:8px;height:8px;border-radius:50%;margin-top:6px}
+#chat .bk-m b{font-size:12.5px;font-weight:600}#chat .bk-m small{color:var(--faint);font-size:11.5px}
+#chat .bk-m div.t{color:var(--ink);line-height:1.6;margin-top:2px}
+#chat .bk-m.wait div.t{color:var(--faint)}
+#chat .bk-welcome{margin:auto 0;padding:0 4px}
+#chat .bk-welcome .welcome-index{display:none}
+#chat .bk-welcome h2{font-size:18px;font-weight:600;margin:0 0 8px;color:#ececee}
+#chat .bk-welcome p{color:var(--mute);font-size:13px;line-height:1.65;margin:0 0 8px}
+#chat .bk-to{padding:8px 10px 0;gap:2px;border-top:1px solid var(--line)}
+#chat .bk-to button{font-size:12px;padding:3px 8px;border-radius:5px;color:var(--mute)}
+#chat .bk-to button:hover{background:var(--hover)}#chat .bk-to button[aria-pressed=true]{background:var(--p3);color:var(--ink)}
+#chat .bk-in{padding:8px 10px 10px;gap:6px}
+#chat .bk-in textarea{background:var(--p2);border:1px solid var(--line2);border-radius:7px;font-size:13px;color:var(--ink);min-height:40px;padding:9px 11px}
+#chat .bk-in textarea:focus{outline:none;border-color:var(--accent)}
+#chat .bk-in button{background:var(--accent);color:#fff;border-radius:7px;font-weight:600;padding:0 14px}
+#chat .bk-note2{color:var(--faint)}
+
+/* settings: slides over the channel */
+.side{display:none;position:absolute;z-index:12;top:0;right:0;bottom:0;width:min(400px,100%);flex-direction:column;background:var(--p1);border-left:1px solid var(--line2);box-shadow:-18px 0 50px rgba(0,0,0,.45)}
+.app.side-open .side{display:flex}
+.side-close{display:block!important;align-self:flex-end;margin:8px 8px 0;border-radius:5px!important;font-size:12px!important}
+.tabs{padding:4px 10px 8px;gap:2px;border-bottom:1px solid var(--line)}
+.tabs button{font-size:12.5px;padding:4px 9px;border-radius:5px;color:var(--mute)}
+.tabs button:hover{background:var(--hover)}.tabs button[aria-selected=true]{background:var(--p3);color:var(--ink)}
+.view{padding:16px}
+.sec,.row{border-color:var(--line)}
+h3{font-size:13.5px;font-weight:600;color:#ececee}.sub{color:var(--mute);line-height:1.6}
+label{color:var(--mute)}
+input,textarea,select{background:var(--p2);border:1px solid var(--line2);border-radius:6px;color:var(--ink)}
+input:focus,textarea:focus,select:focus{outline:none;border-color:var(--accent)}
+.btn{background:var(--accent);color:#fff;border-radius:6px;font-weight:600}
+.btn.ghost{background:none;border:1px solid var(--line2);color:var(--mute);font-weight:400}
+.chip{background:var(--p3);color:var(--mute);border-radius:4px}
+.bar{background:var(--p3)}
+.grade button{border-color:var(--line2);border-radius:5px}
+.savings{border-color:var(--line2);background:var(--p2)}.savings b{color:var(--ink)}
+details summary{color:var(--accent)}
+
+/* status line */
+.statusbar{display:flex;align-items:center;justify-content:flex-end;gap:16px;padding:0 12px;background:var(--p1);border-top:1px solid var(--line);font-size:11.5px;color:var(--faint)}
+.statusbar span{display:flex;align-items:center;gap:6px}.statusbar i{width:6px;height:6px;border-radius:50%;background:var(--up)}
+.statusbar .status-right{display:none}
+.app.zen main{grid-template-columns:44px 248px minmax(0,1fr) 0}.app.zen #chat{visibility:hidden}.app.zen #focus-mode{color:var(--ink)}
+
+/* search */
+.command-dialog{width:min(560px,calc(100vw - 32px));padding:0;border:1px solid var(--line2);border-radius:10px;background:var(--p1);color:var(--ink);box-shadow:0 30px 90px rgba(0,0,0,.7)}
+.command-dialog::backdrop{background:rgba(0,0,0,.5)}
+.command-top{display:flex;align-items:center;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+.command-top input{flex:1;background:none;border:0;font-size:15px;padding:2px 0}.command-top input:focus{outline:none}
+.command-top button{background:var(--p2);border:1px solid var(--line2);border-radius:4px;color:var(--mute);cursor:pointer;font-size:11px;padding:1px 6px}
+.command-results{padding:6px;max-height:52vh;overflow:auto}
+.command-results button{display:flex;justify-content:space-between;width:100%;text-align:left;padding:8px 10px;border:0;border-radius:6px;background:none;color:var(--ink);cursor:pointer;font-size:13px}
+.command-results button:hover,.command-results button:focus{background:var(--sel);outline:none}
+.command-results small{color:var(--faint)}
+.command-hint{padding:8px 14px;color:var(--faint);font-size:11.5px;border-top:1px solid var(--line)}
+#toast{background:var(--p2);border:1px solid var(--line2);border-radius:8px;color:var(--ink)}
+
+@media(max-width:1200px){main{grid-template-columns:44px 210px minmax(0,1fr) 320px}.app.zen main{grid-template-columns:44px 210px minmax(0,1fr) 0}}
+@media(max-width:1000px){main{grid-template-columns:44px minmax(0,1fr) 320px}.explorer{display:none}#graph{grid-column:2}#chat{grid-column:3}.app.zen main{grid-template-columns:44px minmax(0,1fr) 0}}
+/* phones: the graph fills the screen; chat and settings are full sheets; tabs at the bottom */
+.mtabs{display:none}
+@media(max-width:760px){
+  .app{grid-template-rows:44px minmax(0,1fr) 50px}
+  main,.app.zen main{grid-template-columns:minmax(0,1fr)}
+  #graph{grid-column:1}
+  .rail,.explorer,.statusbar,.graph-foot{display:none}
+  .brand>span:last-child{display:none}
+  .pill:has(#ai-txt),.pill:has(#work-txt){display:none}.command kbd{display:none}
+  .proj{max-width:150px}
+  #graph{height:auto;min-height:0}
+  #chat,.app.zen #chat{display:none}
+  .app[data-m=chat] #chat{display:flex;visibility:visible;position:absolute;inset:0;z-index:4;height:auto;min-height:0;border:0}
+  .app[data-m=side] .side,.app.side-open .side{display:flex;position:absolute;inset:0;width:auto;height:auto;min-height:0;border:0;box-shadow:none}
+  .graph-modes{top:10px;right:10px}
+  #graph .bk-zoom{right:10px;bottom:10px}
+  #graph .bk-note{left:8px;right:8px;top:52px;bottom:8px;width:auto}
+  .mtabs{display:flex;background:var(--p1);border-top:1px solid var(--line);padding:0 6px max(0px,env(safe-area-inset-bottom,0px));gap:4px}
+  .mtabs button{flex:1;border:0;background:none;color:var(--mute);font-size:13px;border-radius:0}
+  .mtabs button[aria-pressed=true]{color:var(--ink);box-shadow:inset 0 2px 0 var(--accent)}
+}
+</style>
+</head><body>
+
+<div class="app" id="app" data-m="graph">
+  <header class="top">
+    <div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 16 16" fill="none"><path d="M3.5 11.5 8 4.5l4.5 7M3.5 11.5h9" stroke="currentColor" stroke-opacity=".55" stroke-width="1.1"/><circle cx="8" cy="4.5" r="2" fill="currentColor"/><circle cx="3.5" cy="11.5" r="1.6" fill="#dcdde0"/><circle cx="12.5" cy="11.5" r="1.6" fill="#dcdde0"/></svg></span><span>Firefly</span></div>
+    <input class="name" id="pname" aria-label="Project name" value="Firefly" maxlength="60">
+    <select id="proj" class="proj" aria-label="Switch project" hidden></select>
+    <div class="pills">
+      <button class="pill command" id="command-btn" type="button">Search <kbd>⌘K</kbd></button>
+      <span class="pill"><i class="dot" id="ai-dot"></i>AI <b id="ai-txt">connecting</b></span>
+      <span class="pill"><i class="dot" id="work-dot"></i>Working <b id="work-txt">–</b></span>
+      <button class="pill" id="side-btn" type="button" style="cursor:pointer">Settings</button>
+    </div>
+  </header>
+  <main>
+    <nav class="rail" aria-label="Workspace tools"><button class="active" type="button" id="rail-graph" aria-label="Sky view" title="Sky view"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="10" cy="10" r="2.2"/><ellipse cx="10" cy="10" rx="8" ry="3.4" transform="rotate(-25 10 10)"/><circle cx="16.2" cy="6.4" r="1" fill="currentColor"/></svg></button><button type="button" data-panel="memory" aria-label="Memories" title="Memories"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M10 2.5l1.6 4.4 4.6.2-3.6 2.9 1.3 4.5L10 11.9l-3.9 2.6 1.3-4.5-3.6-2.9 4.6-.2z" stroke-linejoin="round"/></svg></button><button type="button" data-panel="team" aria-label="Crew" title="Crew"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3"><circle cx="10" cy="10" r="2.4"/><circle cx="10" cy="10" r="6.2" stroke-dasharray="3 2.4"/><circle cx="4.5" cy="4.6" r="1.3"/><circle cx="15.6" cy="15" r="1.3"/></svg></button><button type="button" data-panel="tasks" aria-label="Tasks" title="Tasks"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M7.5 5.5h9M7.5 10h9M7.5 14.5h9"/><circle cx="4" cy="5.5" r="1"/><circle cx="4" cy="10" r="1"/><circle cx="4" cy="14.5" r="1"/></svg></button><button class="rail-bottom" id="focus-mode" type="button" aria-label="Toggle focus mode" aria-pressed="false" title="Focus mode"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.3"><path d="M3.5 7.5v-4h4M16.5 7.5v-4h-4M3.5 12.5v4h4M16.5 12.5v4h-4"/></svg></button></nav>
+    <aside class="explorer" aria-label="Crew and memories">
+      <div class="ex-head">Crew <span id="crew-count"></span></div><div class="ex-list" id="crew-list"></div>
+      <div class="ex-head">Memories <span id="vault-count"></span></div><div class="ex-list grow" id="vault-list"></div>
+    </aside>
+    <section id="chat" aria-label="Chat"></section>
+    <section id="graph" aria-label="The brain"><div class="graph-head"><h1 id="graph-title">Firefly</h1></div><div class="graph-modes" role="group" aria-label="Graph contents"><button type="button" data-lens="all" aria-pressed="true">All</button><button type="button" data-lens="team" aria-pressed="false">Crew</button><button type="button" data-lens="memory" aria-pressed="false">Memories</button></div><div class="graph-foot"><button type="button" id="explore-team">Crew</button><button type="button" id="explore-memory">Find a memory</button><button type="button" id="signal-demo">Ping crew</button><button type="button" id="graph-reset" title="Put everyone back in their place">Reset</button></div></section>
+    <aside class="side" aria-label="Brain settings">
+      <button class="btn ghost side-close" id="side-close" type="button">Close ×</button>
+      <nav class="tabs" role="tablist">
+        <button role="tab" aria-selected="true" data-t="team" type="button">Team</button>
+        <button role="tab" aria-selected="false" data-t="skills" type="button">Skills</button>
+        <button role="tab" aria-selected="false" data-t="jev" type="button">JEV</button>
+        <button role="tab" aria-selected="false" data-t="memory" type="button">Memory</button>
+        <button role="tab" aria-selected="false" data-t="models" type="button">Models</button>
+        <button role="tab" aria-selected="false" data-t="tasks" type="button">Tasks</button>
+      </nav>
+      <div class="view" id="v-team"></div>
+      <div class="view" id="v-skills" hidden></div>
+      <div class="view" id="v-jev" hidden></div>
+      <div class="view" id="v-memory" hidden></div>
+      <div class="view" id="v-models" hidden></div>
+      <div class="view" id="v-tasks" hidden></div>
+    </aside>
+  </main>
+  <footer class="statusbar"><span id="graph-count">Loading</span><span><i></i><span id="workspace-count">Loading</span></span><span class="status-right"></span></footer>
+  <nav class="mtabs" aria-label="Sections">
+    <button type="button" data-m="graph" aria-pressed="true">Graph</button>
+    <button type="button" data-m="chat" aria-pressed="false">Chat</button>
+    <button type="button" data-m="side" aria-pressed="false">Settings</button>
+  </nav>
+</div>
+
+<dialog class="command-dialog" id="command-dialog" aria-label="Explore Firefly"><div class="command-top"><input id="command-search" aria-label="Search team, notes and settings" placeholder="Find a teammate, note, or setting…" autocomplete="off"><button type="button" id="command-close" aria-label="Close search">Esc</button></div><div class="command-results" id="command-results"></div><div class="command-hint">↑ ↓ to navigate · Enter to open · Esc to close</div></dialog>
+<script id="brain-js">/* Brain kit: an Obsidian-style living graph for any project. One file, no dependencies.
+ *
+ *   const brain = Brain.mount(document.getElementById("here"), {
+ *     hub:  {id:"lead", label:"Lead", color:"#8b6cef", info:"Runs the team"},       // centre of the circle
+ *     top:  {id:"owner", label:"Owner", color:"#f0f0f0"},                             // optional, just above the hub
+ *     ring: [{id:"scout", label:"Scout", color:"#f2e36b", info:"Finds trends"}, ...], // members, evenly on a circle
+ *     notes:[{id:"Home", text:"# Home\n- see [[Lessons]]", links:["Lessons"], attach:"lead"}, ...], // vault notes
+ *     extra:{nodes:[{id:"x", label:"Card 12", color:"#8a8a8a"}], links:[["scout","x"]]},           // anything else
+ *     onSelect(node){ ... },     // click on a node (notes open in the built-in viewer unless noteViewer:false)
+ *   });
+ *   brain.update(sameShapeAsAbove);   brain.setActive(["scout"]);   brain.pulse("lead","scout");   brain.burst("lead");
+ *   brain.focus("scout");   brain.fit();   brain.openNote("Home");   brain.destroy();
+ *
+ * Light on the machine: draws only when something moves or changes, at most 30 frames a second; glows are cached.
+ */
+(function (root) {
+  "use strict";
+  const CSS = `
+.bk{position:relative;overflow:hidden;background:var(--bk-bg,#1e1e1e);font-family:Inter,"Segoe UI",system-ui,sans-serif;color:#dadada}
+.bk canvas{position:absolute;inset:0;width:100%;height:100%;touch-action:none;cursor:grab}
+.bk canvas.bk-drag{cursor:grabbing}
+.bk-tip{position:absolute;pointer-events:none;background:#262626;border:1px solid #3a3a3a;border-radius:6px;box-shadow:0 4px 14px #0006;padding:7px 9px;font-size:12px;max-width:260px;display:none;z-index:3}
+.bk-tip b{display:block;font-weight:600;margin-bottom:2px}.bk-tip small{color:#9a9a9a}
+.bk-zoom{position:absolute;right:12px;bottom:12px;display:flex;flex-direction:column;gap:6px;z-index:2}
+.bk-zoom button{width:30px;height:30px;border-radius:5px;background:#252525;border:1px solid #2e2e2e;color:#9a9a9a;cursor:pointer;font:inherit}
+.bk-note{position:absolute;right:14px;top:14px;bottom:14px;width:min(440px,calc(100% - 28px));background:#181818;border:1px solid #3a3a3a;border-radius:8px;box-shadow:0 10px 30px #0008;display:flex;flex-direction:column;z-index:4}
+.bk-note[hidden]{display:none}
+.bk-note header{display:flex;align-items:center;gap:8px;padding:10px 12px;border-bottom:1px solid #2e2e2e}
+.bk-note header b{font-size:14px;flex:1}
+.bk-note header button{background:none;border:1px solid #3a3a3a;border-radius:5px;color:#9a9a9a;padding:4px 9px;cursor:pointer;font:inherit;font-size:12px}
+.bk-nb{overflow-y:auto;padding:12px 14px;font-size:13.5px;line-height:1.55;color:#d6d6d6}
+.bk-nb h1,.bk-nb h2,.bk-nb h3{font-size:15px;font-weight:600;margin:14px 0 6px;color:#ececec}.bk-nb h1{font-size:17px;margin-top:2px}
+.bk-nb ul{margin:4px 0;padding-left:18px}.bk-nb p{margin:6px 0}
+.bk-nb code{font:12px ui-monospace,Menlo,monospace;background:#252525;padding:1px 4px;border-radius:3px}
+.bk-nb table{border-collapse:collapse;width:100%;font-size:12.5px}.bk-nb th,.bk-nb td{text-align:left;padding:5px 4px;border-bottom:1px solid #2e2e2e}
+.bk-nb a{color:#a68af9;cursor:pointer;border-bottom:1px dotted #a68af9;text-decoration:none}
+.bk-chat{display:flex;flex-direction:column;min-height:0;background:#181818;border-left:1px solid #2e2e2e;color:#dadada;font-family:Inter,"Segoe UI",system-ui,sans-serif}
+.bk-msgs{flex:1;overflow-y:auto;padding:12px 14px;display:flex;flex-direction:column;gap:11px;min-height:0}
+.bk-m{display:grid;grid-template-columns:20px minmax(0,1fr);gap:8px;font-size:13.5px}
+.bk-m i{width:20px;height:20px;border-radius:5px;display:block}
+.bk-m b{font-weight:600;font-size:13px}.bk-m small{color:#777;margin-left:6px;font-size:11px}
+.bk-m div.t{white-space:pre-wrap;overflow-wrap:anywhere;color:#d3d3d3;margin-top:2px}
+.bk-m.you div.t{color:#f0f0f0}.bk-m.wait div.t{color:#888}
+.bk-to{display:flex;gap:4px;overflow-x:auto;scrollbar-width:none;padding:8px 12px 0}
+.bk-to button{flex:none;background:none;border:0;border-radius:5px;padding:5px 8px;color:#9a9a9a;font:inherit;font-size:12.5px;cursor:pointer;display:flex;gap:6px;align-items:center}
+.bk-to button i{width:8px;height:8px;border-radius:50%}.bk-to button[aria-pressed="true"]{background:#252525;color:#ececec}
+.bk-in{display:flex;gap:8px;padding:8px 12px 12px}
+.bk-in textarea{flex:1;min-width:0;resize:none;min-height:40px;max-height:140px;background:#252525;border:1px solid #3a3a3a;border-radius:6px;color:#ececec;padding:9px 11px;font:inherit;font-size:13.5px}
+.bk-in button{flex:none;border:0;border-radius:6px;background:#8b6cef;color:#fff;padding:0 14px;font:inherit;font-weight:500;cursor:pointer}
+.bk-note2{color:#777;font-size:11.5px;padding:0 12px 8px}`;
+
+  const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+  function hexA(hex, a) {
+    const h = String(hex || "#888").replace("#", ""); const v = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+    return `rgba(${v >> 16 & 255},${v >> 8 & 255},${v & 255},${a})`;
+  }
+
+  /* Markdown for notes: headings, lists, tables, **bold**, `code`, [[wikilinks]] (clickable). Escapes everything first. */
+  function markdown(text) {
+    const inline = (t) => esc(t).replace(/\[\[([^\]|#]+)(?:#[^\]|]*)?(?:\|([^\]]*))?\]\]/g, (m, id, alias) => `<a data-note="${esc(id.trim())}">${esc((alias || id).trim())}</a>`)
+      .replace(/\*\*([^*]+)\*\*/g, "<b>$1</b>").replace(/`([^`]+)`/g, "<code>$1</code>");
+    let html = "", list = false, tbl = [], para = [];
+    const table = (rows) => { const cells = rows.filter((r) => !/^\s*\|?\s*:?-{2,}/.test(r)).map((r) => r.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim()));
+      return `<div style="overflow-x:auto;margin:6px 0"><table>${cells.map((r, i) => `<tr>${r.map((c) => i ? `<td>${inline(c)}</td>` : `<th>${inline(c)}</th>`).join("")}</tr>`).join("")}</table></div>`; };
+    const flush = () => { if (para.length) { html += `<p>${inline(para.join(" "))}</p>`; para = []; } if (list) { html += "</ul>"; list = false; } if (tbl.length) { html += table(tbl); tbl = []; } };
+    for (const line of String(text || "").replace(/^---[\s\S]*?\n---\n/, "").split("\n")) {
+      if (/^\s*\|/.test(line)) { if (para.length || list) { const t = tbl; tbl = []; flush(); tbl = t; } tbl.push(line); continue; }
+      if (tbl.length) flush();
+      const h = line.match(/^(#{1,3})\s+(.*)/), li = line.match(/^\s*[-*]\s+(.*)/);
+      if (h) { flush(); html += `<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`; }
+      else if (li) { if (para.length) { const l = list; list = false; flush(); list = l; } if (!list) { html += "<ul>"; list = true; } html += `<li>${inline(li[1])}</li>`; }
+      else if (line.trim()) { if (list) { html += "</ul>"; list = false; } para.push(line.trim()); }
+      else flush();
+    }
+    flush(); return html;
+  }
+
+  function mount(el, opts) {
+    if (!document.getElementById("bk-css")) { const st = document.createElement("style"); st.id = "bk-css"; st.textContent = CSS; document.head.append(st); }
+    el.classList.add("bk");
+    el.insertAdjacentHTML("beforeend", `<canvas aria-label="Graph"></canvas><div class="bk-tip"></div>
+      <div class="bk-zoom"><button type="button" data-z="in" aria-label="Zoom in">+</button><button type="button" data-z="out" aria-label="Zoom out">−</button><button type="button" data-z="fit" aria-label="Fit">◎</button></div>
+      <aside class="bk-note" hidden><header><b></b><button type="button">Close</button></header><div class="bk-nb"></div></aside>`);
+    const cv = el.querySelector("canvas"), ctx = cv.getContext("2d"), tip = el.querySelector(".bk-tip"), noteEl = el.querySelector(".bk-note");
+    let o = opts || {};
+    let W = 0, H = 0, dpr = 1, nodes = [], edges = [], byId = new Map(), adj = new Map();
+    let view = {x: 0, y: 0, k: 1}, hover = null, hl = null, drag = null, pan = null, alpha = 1, dirty = true, alive = true;
+    const active = new Set(), pulses = [], pointers = new Map(); let pinch = null;
+    const FONT = getComputedStyle(el).fontFamily, MONO = '"JetBrains Mono", ui-monospace, Menlo, monospace';
+    const sprites = new Map(), auras = new Map();
+
+    function sprite(color) {
+      let c = sprites.get(color); if (c) return c;
+      c = document.createElement("canvas"); c.width = c.height = 64; const x = c.getContext("2d");
+      const g = x.createRadialGradient(32, 32, 0, 32, 32, 32); g.addColorStop(0, color); g.addColorStop(1, "rgba(0,0,0,0)");
+      x.fillStyle = g; x.fillRect(0, 0, 64, 64); sprites.set(color, c); return c;
+    }
+    function resize() { const r = cv.getBoundingClientRect(); dpr = Math.min(2, window.devicePixelRatio || 1); W = r.width; H = r.height; cv.width = W * dpr; cv.height = H * dpr; sky = null; dirty = true; requestAnimationFrame(() => { if (alive) fit(); }); }
+
+    /* ---------- theme: flat and quiet, like a good notes app; override any colour with opts.theme ---------- */
+
+    const T = Object.assign({bg: "#050912", node: "#8e9196", text: "#dfe8f5", faintText: "#8fa3c0", line: "rgba(120,190,200,.20)", bridge: "rgba(127,220,255,.16)", accent: "#7fdcff"}, opts?.theme || {});
+    let clock = 0;   // ms, for the slow drift of each chart
+    /* ---------- the universe: painted once per size, then just copied each frame ---------- */
+    let sky = null, twinklers = [], shocks = [];
+    const rand = (seed) => () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; };
+    const STAR_TINTS = ["#cfe0ff", "#e8efff", "#ffffff", "#fff4e6", "#ffe2bf", "#bcd4ff"];
+    const PAD = 220;   // the sky is painted larger than the screen so it can drift with the camera
+    function paintSky() {
+      const w = Math.ceil(W + PAD * 2), h = Math.ceil(H + PAD * 2), c = document.createElement("canvas");
+      c.width = Math.ceil(w * dpr); c.height = Math.ceil(h * dpr); const x = c.getContext("2d"); x.scale(dpr, dpr);
+      const R = rand(7919);
+      const base = x.createRadialGradient(w * .55, h * .42, 0, w * .55, h * .42, Math.max(w, h) * .8);
+      base.addColorStop(0, "#08080a"); base.addColorStop(.55, "#040405"); base.addColorStop(1, "#000000");
+      x.fillStyle = base; x.fillRect(0, 0, w, h);
+      x.globalCompositeOperation = "lighter";
+      // nebulae: soft clouds of deep blue, teal and a little violet
+      const clouds = [["#3a3a44", .07], ["#2b2733", .06], ["#25302f", .05], ["#332b2b", .04]];   // barely-there neutral haze
+      for (let i = 0; i < 14; i++) { const [col, a] = clouds[i % clouds.length], cx = R() * w, cy = R() * h, rr = (0.18 + R() * 0.35) * Math.max(w, h);
+        const g = x.createRadialGradient(cx, cy, 0, cx, cy, rr); g.addColorStop(0, hexA(col, a * (0.5 + R() * 0.6))); g.addColorStop(1, hexA(col, 0));
+        x.fillStyle = g; x.fillRect(0, 0, w, h); }
+      // the galactic band: a tilted haze with a dense river of faint stars
+      x.save(); x.translate(w / 2, h / 2); x.rotate(-0.42);
+      const bandW = Math.hypot(w, h), bandH = Math.min(w, h) * .32;
+      const bg = x.createLinearGradient(0, -bandH, 0, bandH); bg.addColorStop(0, "rgba(200,200,210,0)"); bg.addColorStop(.5, "rgba(210,210,220,.035)"); bg.addColorStop(1, "rgba(120,150,220,0)");
+      x.fillStyle = bg; x.fillRect(-bandW / 2, -bandH, bandW, bandH * 2);
+      for (let i = 0; i < 2600; i++) { const g1 = (R() + R() + R() - 1.5) / 1.5; const px = (R() - .5) * bandW, py = g1 * bandH;
+        x.fillStyle = hexA(STAR_TINTS[i % STAR_TINTS.length], .08 + R() * .35); const s1 = R() < .97 ? .55 : 1.1; x.fillRect(px, py, s1, s1); }
+      x.restore();
+      // the star field
+      for (let i = 0; i < 1100; i++) { const px = R() * w, py = R() * h, big = R(), size = big > .985 ? 1.6 : big > .9 ? 1.05 : .6;
+        x.fillStyle = hexA(STAR_TINTS[Math.floor(R() * STAR_TINTS.length)], .25 + R() * .6); x.beginPath(); x.arc(px, py, size, 0, Math.PI * 2); x.fill(); }
+      x.globalCompositeOperation = "source-over";
+      // a soft vignette keeps the edges deep
+      const v = x.createRadialGradient(w / 2, h / 2, Math.min(w, h) * .35, w / 2, h / 2, Math.max(w, h) * .75); v.addColorStop(0, "rgba(0,0,0,0)"); v.addColorStop(1, "rgba(0,0,0,.55)");
+      x.fillStyle = v; x.fillRect(0, 0, w, h);
+      sky = c;
+      let cs = 9001; const CR = () => ((cs = (cs * 16807) % 2147483647) / 2147483647);
+      constellations = Array.from({length: 20}, () => { const cx = (CR() - .5) * 1.6, cy = (CR() - .5) * 1.6, n = 4 + Math.floor(CR() * 4), pts = [];
+        let px = cx, py = cy; for (let i = 0; i < n; i++) { px += (CR() - .5) * .16; py += (CR() - .5) * .16; pts.push([px, py, .6 + CR() * .9]); } return pts; });
+      twinklers = Array.from({length: Math.round(Math.min(60, W * H / 20000))}, () => ({x: R() * w, y: R() * h, r: .7 + R() * 1.3, a: .35 + R() * .5, f: .4 + R() * 1.4, p: R() * 6.28, c: STAR_TINTS[Math.floor(R() * STAR_TINTS.length)], flare: R() < .18}));
+    }
+    let constellations = [];
+    function drawConstellations(t) {   // faint star patterns turning very slowly behind everything
+      const ang = calm ? 0 : t / 600000, ca = Math.cos(ang), sa = Math.sin(ang), S = Math.max(W, H) * .75, cx = W / 2, cy = H / 2;
+      const at = ([x, y]) => [cx + (x * ca - y * sa) * S, cy + (x * sa + y * ca) * S];
+      for (const c of constellations) { ctx.strokeStyle = "rgba(220,225,235,.10)"; ctx.lineWidth = .6; ctx.beginPath();
+        c.forEach((p, i) => { const [x, y] = at(p); i ? ctx.lineTo(x, y) : ctx.moveTo(x, y); }); ctx.stroke();
+        for (const p of c) { const [x, y] = at(p); ctx.fillStyle = "rgba(220,232,255,.55)"; ctx.beginPath(); ctx.arc(x, y, p[2], 0, Math.PI * 2); ctx.fill(); } }
+    }
+    function drawSky(t) {
+      if (!sky) paintSky();
+      const ox = Math.max(-PAD, Math.min(PAD, -view.x * view.k * .045)), oy = Math.max(-PAD, Math.min(PAD, -view.y * view.k * .045));
+      ctx.drawImage(sky, -PAD + ox, -PAD + oy, W + PAD * 2, H + PAD * 2);
+      drawConstellations(t);
+      if (calm) return;
+      for (const s of twinklers) { const a = s.a * (0.55 + 0.45 * Math.sin(t / 1000 * s.f + s.p)), px = s.x - PAD + ox, py = s.y - PAD + oy;
+        if (px < -4 || py < -4 || px > W + 4 || py > H + 4) continue;
+        ctx.globalAlpha = a; ctx.drawImage(sprite(s.c), px - s.r * 3, py - s.r * 3, s.r * 6, s.r * 6);
+        if (s.flare) { ctx.strokeStyle = hexA(s.c, a * .5); ctx.lineWidth = .6; ctx.beginPath(); ctx.moveTo(px - s.r * 5, py); ctx.lineTo(px + s.r * 5, py); ctx.moveTo(px, py - s.r * 5); ctx.lineTo(px, py + s.r * 5); ctx.stroke(); } }
+      ctx.globalAlpha = 1;
+    }
+
+    const calm = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const ro = new ResizeObserver(resize); ro.observe(cv); resize();
+
+    function build() {
+      const keep = new Map(nodes.map((n) => [n.id, n])); nodes = []; edges = []; byId = new Map(); adj = new Map();
+      const add = (id, props) => { const old = keep.get(id); const a = Math.random() * Math.PI * 2, d = 80 + Math.random() * 160;
+        const n = {id, x: Math.cos(a) * d, y: Math.sin(a) * d, vx: 0, vy: 0, deg: 0, ...props};
+        if (old) Object.assign(n, {x: old.x, y: old.y, vx: old.vx, vy: old.vy, fixed: old.fixed, userMoved: old.userMoved});
+        byId.set(id, n); nodes.push(n); adj.set(id, new Set()); return n; };
+      const link = (a, b) => { if (a === b || !byId.has(a) || !byId.has(b)) return; const k = a < b ? a + "|" + b : b + "|" + a;
+        if (edges.some((e) => e.k === k)) return; edges.push({k, a, b}); adj.get(a).add(b); adj.get(b).add(a); byId.get(a).deg++; byId.get(b).deg++; };
+      const place = (id, x, y) => { const n = byId.get(id); if (n && !n.userMoved) { n.x = x; n.y = y; n.vx = n.vy = 0; n.fixed = true; } };
+      const hub = o.hub, ring = o.ring || [], notes = o.notes || [], extra = o.extra || {};
+      if (hub) add(hub.id, {kind: "hub", r: 8, ...hub});
+      if (o.top) { add(o.top.id, {kind: "top", r: 11, ...o.top}); if (hub) link(o.top.id, hub.id); }
+      for (const m of ring) { add(m.id, {kind: "member", r: 7.5, ...m}); if (hub) link(hub.id, m.id); }
+      const R = o.radius || 270;
+      if (o.layout === "hierarchy") {
+        /* Left to right: the person, the Lead, then the crew from strongest/most used to weakest. Members zig-zag a little
+         * so every line from the Lead stays visible. rank feeds the dot size: earlier = bigger. */
+        const chain = [o.top, hub, ...ring].filter(Boolean);
+        const members = (id) => (o.notes || []).filter((nt) => nt.group === id).length + ((o.extra || {}).nodes || []).filter((e) => e.group === id).length;
+        const size = (m) => 44 + 16 * Math.sqrt(members(m.id));   // a chart's radius grows with what's in it
+        let x = 0; const xs = chain.map((m, i) => (x += i ? size(chain[i - 1]) + size(m) + 34 : 0));
+        const mid = (xs[0] + xs[xs.length - 1]) / 2;
+        chain.forEach((m, i) => { const n = byId.get(m.id); if (n) { n.rank = i; n.group = n.id; n.phase = i * 1.7; n.size = size(m); }
+          place(m.id, xs[i] - mid, 0); });
+      } else {
+        if (hub) place(hub.id, 0, 0); if (o.top) place(o.top.id, 0, -105);
+        ring.forEach((m, i) => { const a = -Math.PI / 2 + (i + 0.5) / ring.length * Math.PI * 2; place(m.id, Math.cos(a) * R, Math.sin(a) * R); });
+      }
+      notes.forEach((nt, i) => { const n = add("note:" + nt.id, {kind: "note", label: nt.title || nt.id, color: o.noteColor || "#d9d3f7", note: nt, info: nt.path || "note", group: nt.group || null});
+        if (!keep.has("note:" + nt.id)) { const c = n.group && byId.get(n.group), a = i * 2.39996, d = c ? 30 + 9 * Math.sqrt(i) : R * .6;
+          n.x = (c ? c.x : 0) + Math.cos(a) * d; n.y = (c ? c.y : 0) + Math.sin(a) * d; } });
+      for (const nt of notes) { for (const l of nt.links || []) link("note:" + nt.id, "note:" + l); if (nt.attach) link("note:" + nt.id, nt.attach); }
+      (extra.nodes || []).forEach((e, i) => { const fresh = !keep.has(e.id), n = add(e.id, {kind: "extra", ...e}), c = n.group && byId.get(n.group);
+        if (fresh && c) { const a = i * 2.39996 + 1, d = 34 + 8 * Math.sqrt(i % 60); n.x = c.x + Math.cos(a) * d; n.y = c.y + Math.sin(a) * d; } });
+      for (const [a, b] of extra.links || []) link(a, b);
+      for (const n of nodes) if (n.r == null) n.r = 2.6 + Math.min(5, Math.sqrt(n.deg) * 1.4);
+      const stars = nodes.filter((n) => n.kind === "note").sort((a, b) => b.deg - a.deg || String(a.label).localeCompare(String(b.label)));
+      const named = Math.max(6, Math.ceil(stars.length * 0.14)), spiked = Math.max(2, Math.ceil(stars.length * 0.06));
+      stars.forEach((n, i) => { n.named = i < named; n.spiked = i < spiked && n.deg >= 2; });
+      if (o.layout === "solar") planSolar();
+      alpha = 1; dirty = true;
+    }
+    const BIG = (n) => n.kind === "hub" || n.kind === "top" || n.kind === "member";
+    function step() {
+      if (o.layout === "solar") return;
+      const k = alpha; if (k < 0.002 && !drag) return;
+      for (let i = 0; i < nodes.length; i++) { const a = nodes[i];
+        for (let j = i + 1; j < nodes.length; j++) { const b = nodes[j]; let dx = b.x - a.x, dy = b.y - a.y; const d2 = dx * dx + dy * dy + 0.01;
+          if (d2 > 250000) continue;
+          const apart = (a.group || a.id) !== (b.group || b.id);
+          const f = (BIG(a) && BIG(b) ? 5200 : apart ? 6000 : 1600) / d2 * k; const d = Math.sqrt(d2);
+          dx /= d; dy /= d; a.vx -= dx * f; a.vy -= dy * f; b.vx += dx * f; b.vy += dy * f; } }
+      for (const e of edges) { const a = byId.get(e.a), b = byId.get(e.b); const dx = b.x - a.x, dy = b.y - a.y; const d = Math.sqrt(dx * dx + dy * dy) || 1;
+        if (BIG(a) && BIG(b)) continue;   // the bridges between charts don't pull: the charts keep their places
+        const cross = (a.group || a.id) !== (b.group || b.id); if (cross) continue;   // links into another chart are drawn, not pulled
+        const want = BIG(a) || BIG(b) ? 64 : 40; const f = (d - want) / d * 0.03 * k; a.vx += dx * f; a.vy += dy * f; b.vx -= dx * f; b.vy -= dy * f; }
+      for (const n of nodes) { const c = n.group && n.group !== n.id ? byId.get(n.group) : null;
+        if (c) { n.vx += (c.x - n.x) * 0.006 * k; n.vy += (c.y - n.y) * 0.006 * k; }
+        else { const pull = n.kind === "note" ? 0.0009 : 0.0025; n.vx -= n.x * pull * k; n.vy -= n.y * pull * k; }
+        if (n === drag?.n || n.fixed) { n.vx = n.vy = 0; continue; } n.vx *= 0.82; n.vy *= 0.82; n.x += n.vx; n.y += n.vy; }
+      if (o.layout !== "solar") { separate(); keepInCharts(); }
+      alpha *= 0.985;
+    }
+    /* Nothing may sit on anything else. Each node takes the space it really uses on screen (a card, or a note icon with
+     * its label underneath), converted to graph units at the current zoom, so the layout stays clean at every zoom. */
+    /* Sizes are in graph units (they grow and shrink with zoom, like a notes-app graph). */
+    const LABELS_AT = 0.85;   // below this zoom, small dots hide their names (they fade in above it)
+    const zoomR = (r) => r * Math.max(0.55, Math.min(2.2, view.k));
+    const nodeR = (n) => o.layout === "solar" ? solarR(n) * Math.max(0.6, Math.min(2.4, view.k)) : BIG(n) ? zoomR(n.rank == null ? (n.kind === "hub" ? 8 : 7) : Math.max(5, 9 - n.rank * 0.45)) : zoomR(2.2 + Math.min(3.6, Math.sqrt(n.deg || 0) * 1.05));
+    const labelAlpha = (n) => BIG(n) ? 1 : Math.max(0, Math.min(1, (view.k - LABELS_AT) / 0.35));
+    function footprint(n) {
+      const kk = view.k || 1, r = nodeR(n);
+      if (!BIG(n) && labelAlpha(n) <= 0) return {hw: (r + 6) / kk, hh: (r + 6) / kk, ox: 0, oy: 0};
+      const chars = Math.min(BIG(n) ? 18 : 26, String(n.label ?? n.id).length), cw = BIG(n) ? 7.4 : 6;
+      if (BIG(n) && n.size) return {hw: (r + 12) / kk, hh: (r + 12) / kk, ox: 0, oy: 0};   // title sits above the chart, outside it
+      if (BIG(n)) return {hw: Math.max(r + 16, chars * cw / 2 + 10) / kk, hh: (r * 2 + 50) / kk / 2, ox: 0, oy: 16 / kk};
+      return {hw: Math.max(r + 6, chars * cw / 2 + 4) / kk, hh: (r * 2 + 20) / kk / 2, ox: 0, oy: 9 / kk};
+    }
+    /* A chart's own dots stay inside its circle, so charts never run into each other. */
+    function keepInCharts() {
+      for (const n of nodes) { const c = n.group && n.group !== n.id ? byId.get(n.group) : null; if (!c || !c.size || n === drag?.n) continue;
+        const dx = n.x - c.x, dy = n.y - c.y, d = Math.hypot(dx, dy) || 1, max = c.size - 10;
+        if (d > max) { n.x = c.x + dx / d * max; n.y = c.y + dy / d * max; n.vx *= .3; n.vy *= .3; } }
+    }
+    function separate() {
+      for (let pass = 0; pass < 3; pass++) {
+        for (let i = 0; i < nodes.length; i++) { const a = nodes[i], fa = footprint(a);
+          for (let j = i + 1; j < nodes.length; j++) { const b = nodes[j];
+            // Only the hub, the node being dragged and nodes the person placed by hand never move. Laid-out cards may be
+            // nudged apart (that's how a narrow phone screen stays readable), but they give way far less than notes do.
+            const still = (n) => n.kind === "hub" || n === drag?.n || n.userMoved || (o.layout === "hierarchy" && BIG(n));
+            const aStill = still(a), bStill = still(b); if (aStill && bStill) continue;
+            const fb = footprint(b), dx = (b.x + fb.ox) - (a.x + fa.ox), dy = (b.y + fb.oy) - (a.y + fa.oy);
+            const ox = fa.hw + fb.hw - Math.abs(dx), oy = fa.hh + fb.hh - Math.abs(dy);
+            if (ox <= 0 || oy <= 0) continue;
+            const alongX = ox < oy, amount = alongX ? ox : oy, sign = (alongX ? dx : dy) || ((i + j) % 2 ? 1 : -1);
+            const weight = (n) => (BIG(n) ? 1 : 6);   // how readily a node gives way
+            const push = sign > 0 ? amount : -amount, share = aStill ? 0 : bStill ? 1 : weight(a) / (weight(a) + weight(b));
+            if (alongX) { a.x -= push * share; b.x += push * (1 - share); a.vx *= 0.5; b.vx *= 0.5; }
+            else { a.y -= push * share; b.y += push * (1 - share); a.vy *= 0.5; b.vy *= 0.5; } } } }
+    }
+    const toScreen = (n) => [(n.x - view.x) * view.k + W / 2, (n.y - view.y) * view.k + H / 2];
+    const toWorld = (sx, sy) => [(sx - W / 2) / view.k + view.x, (sy - H / 2) / view.k + view.y];
+    const trim = (s, n) => (s = String(s ?? "")).length > n ? s.slice(0, n - 1) + "…" : s;
+    /* ---------- drawing: charts floating in a dark sky ----------
+     * Every crew member is its own small graph (its dot in the middle, its skills, work and memories around it). The
+     * charts sit left to right in rank order and drift very slowly. Hovering anything lights it and its links in the
+     * accent colour and fades the rest; fades are eased, never snapped. */
+    const drift = (n) => { const c = n.group ? byId.get(n.group) : null; if (!c || calm || o.layout === "solar") return [0, 0]; const p = c.phase || 0;
+      return [Math.sin(clock / 9000 + p) * 5, Math.cos(clock / 11000 + p * 1.3) * 4]; };
+    const eased = new Map();   // node id -> current brightness, eased toward its target
+    function light(n, target) { const v = eased.get(n.id) ?? target, next = v + (target - v) * 0.22; eased.set(n.id, Math.abs(next - target) < 0.01 ? target : next); if (next !== target) dirty = true; return eased.get(n.id); }
+    function text(str, x, y, color, font, alpha) { if (alpha <= 0) return; ctx.globalAlpha = alpha; ctx.font = font; ctx.textAlign = "center"; ctx.textBaseline = "top"; ctx.fillStyle = color; ctx.fillText(str, x, y); ctx.globalAlpha = 1; }
+    /* ---------- solar mode: the hierarchy as a solar system ----------
+     * The person is the sun. The Lead is the nearest planet (with a ring); the crew orbit further out from strongest
+     * and most used to weakest. Each planet's skills and work circle it as moons. The shared memories are an outer
+     * belt, still linked like a graph. Orbits follow Kepler (inner planets move faster), seen from slightly above. */
+    const TILT = 0.5; let belt = 300;
+    const hash = (str) => { let h = 2166136261; for (const c of String(str)) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return (h >>> 0) / 4294967296; };
+    function solarR(n) {
+      if (n.kind === "top") return 6.5;
+      if (BIG(n)) return n.kind === "hub" ? 6 : 5;
+      if (n.orbit?.parent) return 3 + Math.min(1.8, Math.sqrt(n.deg || 0) * .6);
+      return 1.6 + Math.min(3, Math.sqrt(n.deg || 0) * .9);   // belt
+    }
+    function planSolar() {
+      const sun = nodes.find((n) => n.kind === "top"), hubN = nodes.find((n) => n.kind === "hub");
+      const planets = [hubN, ...(o.ring || []).map((m) => byId.get(m.id))].filter(Boolean);
+      for (const n of nodes) { n.fixed = true; n.orbit = null; }
+      if (sun) { sun.x = 0; sun.y = 0; sun.vault = 90; sun.pr = 20 + Math.sqrt(90) * 4.6; }
+      let r = 0, prevSoi = (sun?.pr || 30) + 16;   // Dev's own reach
+      planets.forEach((p, i) => {
+        const inside = nodes.filter((m) => m !== p && m.group === p.id).length;
+        p.vault = 45 + Math.min(110, inside * 8); p.pr = 20 + Math.sqrt(p.vault) * 4.6;   // the vault's radius, in graph units
+        const moons = nodes.filter((m) => m !== p && m.group === p.id);
+        let layer = 0, inLayer = 0, cap = 7, soi = p.pr + 14;
+        moons.forEach((m) => { if (inLayer >= cap) { layer++; inLayer = 0; cap = 7 + layer * 6; } m.layer = layer; m.slot = inLayer++; });
+        const layers = moons.length ? layer + 1 : 0;
+        moons.forEach((m) => { const count = m.layer === layer ? inLayer : 7 + m.layer * 6, mr = p.pr + 14 + m.layer * 10;
+          m.orbit = {parent: p, r: mr, speed: 0.00055 / (1 + m.layer * .6), phase: (m.slot / count) * Math.PI * 2 + m.layer * .7}; });
+        soi = p.pr + 14 + Math.max(0, layers - 1) * 10 + (p.id === hubN?.id ? p.pr * 1.3 : 0) + 10;
+        r += Math.max(70, prevSoi + soi + 26); prevSoi = soi;
+        p.orbit = {r, speed: 0.00016 * Math.pow(120 / r, 1.5), phase: hash(p.id) * Math.PI * 2};
+      });
+      // the outer belt: memories in link order, so linked memories sit near each other
+      const free = nodes.filter((n) => !n.orbit && n !== sun && !BIG(n));
+      const order = [], seen = new Set();
+      for (const start of free.slice().sort((a, b) => b.deg - a.deg)) { const q = [start];
+        while (q.length) { const n = q.shift(); if (seen.has(n.id) || !free.includes(n)) continue; seen.add(n.id); order.push(n);
+          for (const id of adj.get(n.id) || []) { const m = byId.get(id); if (m && !seen.has(m.id)) q.push(m); } } }
+      belt = r + prevSoi + 60;
+      const soft = (a, b) => { if (!a || !b || a === b) return; const k2 = a.id < b.id ? a.id + "|" + b.id : b.id + "|" + a.id; if (edges.some((e) => e.k === k2)) return;
+        edges.push({k: k2, a: a.id, b: b.id, soft: true}); adj.get(a.id).add(b.id); adj.get(b.id).add(a.id); };
+      for (const e of edges.filter((x) => x.soft)) { adj.get(e.a)?.delete(e.b); adj.get(e.b)?.delete(e.a); }
+      for (let i2 = edges.length - 1; i2 >= 0; i2--) if (edges[i2].soft) edges.splice(i2, 1);
+      order.forEach((n, j) => { const jit = hash(n.id); n.orbit = {r: belt + (jit - .5) * 44, speed: 0.000022, phase: (j / Math.max(1, order.length)) * Math.PI * 2 + (jit - .5) * .12}; });
+      order.forEach((n, j) => { soft(n, order[(j + 1) % order.length]); soft(n, order[(j + 3) % order.length]);
+        const crew = [sun, ...planets].filter(Boolean); soft(n, crew[Math.floor(hash(n.id + "c") * crew.length)]); });
+      updateSolar(clock);
+    }
+    function updateSolar(t) {
+      const T = 0;   // the system holds still; only the background drifts
+      const place = (n) => { if (n.pinned) { n.x = n.px; n.y = n.py; n.placed = true; return; } const ob = n.orbit; if (!ob) return; const c = ob.parent; if (c && !c.placed) place(c);
+        const a = ob.phase + T * ob.speed, cx = c ? c.x : 0, cy = c ? c.y : 0; n.x = cx + Math.cos(a) * ob.r; n.y = cy + Math.sin(a) * ob.r * TILT; n.placed = true; };
+      for (const n of nodes) n.placed = false;
+      for (const n of nodes) place(n);
+    }
+    const mix = (hex, to, f) => { const h = String(hex).replace("#", ""), v = parseInt(h.length === 3 ? h.split("").map((c) => c + c).join("") : h, 16);
+      const ch = [v >> 16 & 255, v >> 8 & 255, v & 255].map((c) => Math.round(c + (to - c) * f)); return `rgb(${ch[0]},${ch[1]},${ch[2]})`; };
+    /* Each crew member is a little vault: a dense scribble of dots and threads (teal memories, yellow work, violet
+     * skills), generated once from its name so it never changes shape. Bigger vaults hold more. */
+    const vaults = new Map();
+    function vaultShape(n) {
+      const key = n.id + ":" + (n.vault || 30); if (vaults.has(key)) return vaults.get(key);
+      let seed = Math.floor(hash(n.id) * 2147483646) + 1; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      const count = n.vault || 30, rad = (n.pr || 20) - 4, pts = [];
+      for (let i = 0; i < count; i++) { const u = Math.max(1e-6, R()), v = R(), g = Math.sqrt(-2 * Math.log(u)) * .42, ang = v * Math.PI * 2;
+        const d = Math.min(1, g) * rad, kind = R(); pts.push({x: Math.cos(ang) * d, y: Math.sin(ang) * d * .82, s: R() < .08 ? 1.7 : .55 + R() * .7,
+          c: kind < .68 ? "#5fd4c4" : kind < .84 ? "#f2d06b" : kind < .97 ? "#b48cf7" : n.color || "#ffffff"}); }
+      const lines = []; pts.forEach((p1, i) => { const near = pts.map((p2, j) => [j, (p2.x - p1.x) ** 2 + (p2.y - p1.y) ** 2]).filter(([j]) => j !== i).sort((q, w) => q[1] - w[1]).slice(0, 3);
+        for (const [j] of near) if (j > i || R() < .5) lines.push([i, j]); });
+      const shape = {pts, lines}; vaults.set(key, shape); return shape;
+    }
+    function drawVault(n, x, y, a) {
+      const v = vaultShape(n), k = view.k, s1 = Math.max(.6, Math.min(2, k));
+      ctx.globalAlpha = a * .5; ctx.strokeStyle = "rgba(110,200,190,.55)"; ctx.lineWidth = .45; ctx.beginPath();
+      for (const [i, j] of v.lines) { ctx.moveTo(x + v.pts[i].x * k, y + v.pts[i].y * k); ctx.lineTo(x + v.pts[j].x * k, y + v.pts[j].y * k); } ctx.stroke();
+      for (const p of v.pts) { ctx.globalAlpha = a * .9; ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(x + p.x * k, y + p.y * k, p.s * s1, 0, Math.PI * 2); ctx.fill(); }
+      ctx.globalAlpha = 1;
+    }
+    /* Dev and every crew member: its vault, with its own dot and name in the middle. Identity comes later. */
+    function drawBody(n, x, y, t, a, sunXY) {
+      drawVault(n, x, y, a);
+      const R = solarR(n) * Math.max(0.7, Math.min(2.2, view.k)), col = n.kind === "top" ? "#f4f1ea" : n.color || "#8ab4ff", on = active.has(n.id), sel = n === hover || n.id === hl;
+      const dx = sunXY[0] - x, dy = sunXY[1] - y, L = Math.hypot(dx, dy) || 1, ux = n.kind === "top" ? -.4 : dx / L, uy = n.kind === "top" ? -.5 : dy / L;
+      ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = a * (on ? .7 : .35); ctx.drawImage(sprite(col), x - R * 3, y - R * 3, R * 6, R * 6); ctx.globalCompositeOperation = "source-over";
+      const g = ctx.createRadialGradient(x + ux * R * .45, y + uy * R * .45, R * .1, x, y, R);
+      g.addColorStop(0, mix(col, 255, .75)); g.addColorStop(.5, col); g.addColorStop(1, mix(col, 0, .6));
+      ctx.globalAlpha = a; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
+      if (on && !calm) { const k = (t % 1500) / 1500; ctx.globalAlpha = (1 - k) * .6 * a; ctx.strokeStyle = col; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, R + 2 + k * 12, 0, Math.PI * 2); ctx.stroke(); }
+      if (sel) { ctx.globalAlpha = a; ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, R + 3, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.globalAlpha = a * (sel ? 1 : Math.max(0, Math.min(1, (view.k - .3) / .15)) || (n.kind === "top" ? 1 : 0));
+      if (ctx.globalAlpha > .02) { label(trim(n.label ?? n.id, 18), x, y + R + 11, "center", sel ? "#ffffff" : "#e6eefb", "600 11.5px " + FONT);
+        if (on || n.sub) label(on ? "working" : trim(n.sub, 24), x, y + R + 25, "center", on ? col : "#8fa3c0", "10px " + FONT); }
+      ctx.globalAlpha = 1;
+    }
+    /* Other systems far out in the sky: zoom out and the neighbourhood appears. Deterministic, so it never reshuffles. */
+    let galaxy = null;
+    function planGalaxy() { let seed = 4242; const R = () => ((seed = (seed * 16807) % 2147483647) / 2147483647);
+      const tints = ["#ffd9a0", "#bcd4ff", "#ffb3c7", "#a8f0e0", "#ffe9c4", "#c9b8ff"], out = [];
+      for (let i = 0; i < 26; i++) { const ang = R() * Math.PI * 2, dist = belt * (3.2 + R() * 9), sz = .5 + R() * 1.1;
+        out.push({x: Math.cos(ang) * dist, y: Math.sin(ang) * dist * .8, sz, tint: tints[i % tints.length], orbits: 1 + Math.floor(R() * 4),
+          planets: Array.from({length: 1 + Math.floor(R() * 4)}, (_, j) => ({r: (55 + j * 42) * sz, ph: R() * 6.28, sp: .00012 / (1 + j), c: tints[(i + j + 2) % tints.length]}))}); }
+      galaxy = {belt, out}; }
+    function drawGalaxy(t) {
+      if (!galaxy || galaxy.belt !== belt) planGalaxy();
+      const k = view.k, T = 0;
+      for (const g of galaxy.out) { const [x, y] = toScreen(g); const R = 30 * g.sz * k, reach = (g.planets.at(-1).r + 20) * k;
+        if (x < -reach - 40 || y < -reach - 40 || x > W + reach + 40 || y > H + reach + 40) continue;
+        const a = Math.min(1, .35 + .65 * (1 - Math.min(1, k / .6)));   // clearer the further out you are
+        ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = .5 * a; ctx.drawImage(sprite(g.tint), x - Math.max(6, R * 4), y - Math.max(6, R * 4), Math.max(12, R * 8), Math.max(12, R * 8));
+        ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = a; ctx.fillStyle = "#fff7e8"; ctx.beginPath(); ctx.arc(x, y, Math.max(1.2, R * .45), 0, Math.PI * 2); ctx.fill();
+        for (const p of g.planets) { ctx.globalAlpha = .07 * a; ctx.strokeStyle = "#b8c8ff"; ctx.lineWidth = .7; ctx.beginPath(); ctx.ellipse(x, y, p.r * k, p.r * k * TILT, 0, 0, Math.PI * 2); ctx.stroke();
+          const pa = p.ph + T * p.sp, px = x + Math.cos(pa) * p.r * k, py = y + Math.sin(pa) * p.r * k * TILT;
+          ctx.globalAlpha = .8 * a; ctx.fillStyle = p.c; ctx.beginPath(); ctx.arc(px, py, Math.max(.8, 5 * g.sz * k), 0, Math.PI * 2); ctx.fill(); } }
+      ctx.globalAlpha = 1;
+    }
+    function drawSolar(t) {
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0); drawSky(t); drawGalaxy(t);
+      const focus = hover?.id || hl; const nb = focus ? adj.get(focus) : null;
+      const lit = (n) => light(n, !focus || n.id === focus || nb?.has(n.id) || (n.orbit?.parent && (n.orbit.parent.id === focus)) ? 1 : 0.16);
+      const pos = new Map(); for (const n of nodes) pos.set(n.id, toScreen(n));
+      const sun = nodes.find((n) => n.kind === "top"), sunXY = sun ? pos.get(sun.id) : toScreen({x: 0, y: 0}), mid = toScreen({x: 0, y: 0});
+      const k = view.k;
+      // orbits
+      for (const n of nodes) { if (!BIG(n) || !n.orbit) continue; ctx.globalAlpha = .9 * (eased.get(n.id) ?? 1);
+        ctx.strokeStyle = n.id === focus ? hexA(n.color || "#8ab4ff", .4) : "rgba(160,190,255,.065)"; ctx.lineWidth = 0.8;
+        ctx.beginPath(); ctx.ellipse(mid[0], mid[1], n.orbit.r * k, n.orbit.r * k * TILT, 0, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.globalAlpha = 1; ctx.fillStyle = "rgba(140,200,255,.025)"; ctx.beginPath(); ctx.ellipse(mid[0], mid[1], (belt + 34) * k, (belt + 34) * k * TILT, 0, 0, Math.PI * 2);
+      ctx.ellipse(mid[0], mid[1], (belt - 34) * k, (belt - 34) * k * TILT, 0, 0, Math.PI * 2, true); ctx.fill("evenodd");
+      // lines: delegation from the Lead, moons to their planet, memories to each other
+      for (const e of edges) { const a = byId.get(e.a), b = byId.get(e.b), [x1, y1] = pos.get(e.a), [x2, y2] = pos.get(e.b);
+        const on = focus && (e.a === focus || e.b === focus), bridge = BIG(a) && BIG(b);
+        const moon = (a.orbit?.parent === b || b.orbit?.parent === a), cross = !bridge && !moon && (a.group || "") !== (b.group || "");
+        if (cross && !on && !e.soft) continue;
+        ctx.globalAlpha = Math.min(eased.get(e.a) ?? 1, eased.get(e.b) ?? 1);
+        ctx.strokeStyle = on ? "rgba(190,230,255,.7)" : e.soft ? "rgba(120,215,205,.075)" : bridge ? (active.has(e.a) || active.has(e.b) ? "rgba(127,220,255,.4)" : "rgba(127,200,255,.10)") : moon ? "rgba(200,220,255,.07)" : "rgba(120,215,205,.16)";
+        ctx.lineWidth = on ? .9 : .55; if (bridge && !on) ctx.setLineDash([1.5, 6]);
+        ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.setLineDash([]); }
+      ctx.globalAlpha = 1;
+      // bodies back to front, so nearer planets pass in front of farther ones
+      const bodies = nodes.slice().sort((a, b) => pos.get(a.id)[1] - pos.get(b.id)[1]);
+      for (const n of bodies) { const [x, y] = pos.get(n.id); if (x < -120 || y < -120 || x > W + 120 || y > H + 120) continue; const a = lit(n);
+        if (BIG(n)) { drawBody(n, x, y, t, a, sunXY); continue; }
+        const r = solarR(n) * Math.max(0.6, Math.min(2.4, k)), col = n === hover || n.id === hl ? "#ffffff" : dotColor(n), sel = n === hover || n.id === hl;
+        ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = a * (sel ? .9 : n.named ? .55 : .3); ctx.drawImage(sprite(col), x - r * 5, y - r * 5, r * 10, r * 10); ctx.globalCompositeOperation = "source-over";
+        ctx.globalAlpha = a; ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+        const near = focus && nb?.has(n.id), show = sel || near || (!n.orbit?.parent && n.named && k > .55) || k > 1.6;
+        if (show && a > .3) { ctx.globalAlpha = a; label(trim(n.label ?? n.id, 26), x + r + 6, y, "left", sel ? "#ffffff" : near ? "#d8e9ff" : "#9fb3d1", "11px " + FONT); }
+        ctx.globalAlpha = 1; }
+      // comets carrying work
+      ctx.globalCompositeOperation = "lighter";
+      for (let i = pulses.length - 1; i >= 0; i--) { const p = pulses[i]; p.t += p.v;
+        const a = byId.get(p.a), b = byId.get(p.b); if (!a || !b) { pulses.splice(i, 1); continue; }
+        if (p.t >= 1) { shocks.push({id: p.b, c: p.color, t0: t}); if (p.loop) { p.t = 0; p.trail = []; } else { pulses.splice(i, 1); continue; } }
+        const [x1, y1] = pos.get(p.a), [x2, y2] = pos.get(p.b), u = p.t < .5 ? 2 * p.t * p.t : 1 - Math.pow(-2 * p.t + 2, 2) / 2, px = x1 + (x2 - x1) * u, py = y1 + (y2 - y1) * u;
+        (p.trail = p.trail || []).push([px, py]); if (p.trail.length > 14) p.trail.shift();
+        for (let j = 1; j < p.trail.length; j++) { const f = j / p.trail.length; ctx.strokeStyle = hexA(p.color, f * .5); ctx.lineWidth = f * 1.4; ctx.lineCap = "round";
+          ctx.beginPath(); ctx.moveTo(p.trail[j - 1][0], p.trail[j - 1][1]); ctx.lineTo(p.trail[j][0], p.trail[j][1]); ctx.stroke(); }
+        ctx.globalAlpha = .9; ctx.drawImage(sprite(p.color), px - 5, py - 5, 10, 10); ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(px, py, 1.1, 0, Math.PI * 2); ctx.fill(); }
+      for (let i = shocks.length - 1; i >= 0; i--) { const s2 = shocks[i], age = (t - s2.t0) / 700, n = byId.get(s2.id); if (age > 1 || !n) { shocks.splice(i, 1); continue; }
+        const [x, y] = pos.get(n.id); ctx.globalAlpha = (1 - age) * .5; ctx.strokeStyle = s2.c; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.arc(x, y, solarR(n) * k + 3 + age * 26, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = 1; ctx.lineCap = "butt";
+    }
+    function draw(t) {
+      if (o.layout === "solar") return drawSolar(t);
+      ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+      drawSky(t);
+      const focus = hover?.id || hl; const nb = focus ? adj.get(focus) : null;
+      const lit = (n) => light(n, !focus || n.id === focus || nb?.has(n.id) ? 1 : 0.14);
+      const pos = new Map(); for (const n of nodes) { const [x, y] = toScreen(n), [dx, dy] = drift(n); pos.set(n.id, [x + dx, y + dy]); }
+      // links: inside a chart, and the long bridges between charts
+      for (const e of edges) { const a = byId.get(e.a), b = byId.get(e.b), [x1, y1] = pos.get(e.a), [x2, y2] = pos.get(e.b);
+        const on = focus && (e.a === focus || e.b === focus), bridge = BIG(a) && BIG(b), working = bridge && (active.has(e.a) || active.has(e.b));
+        const cross = !bridge && (a.group || a.id) !== (b.group || b.id);   // a task linked to an order in another chart
+        if (cross && !on) continue;   // only shown while hovering, so the sky stays clean
+        ctx.globalAlpha = Math.min(eased.get(e.a) ?? 1, eased.get(e.b) ?? 1);
+        ctx.strokeStyle = on ? hexA(T.accent, .85) : working ? hexA(T.accent, .45) : bridge ? T.bridge : T.line; ctx.lineWidth = on ? 1.3 : 1;
+        ctx.beginPath(); ctx.moveTo(x1, y1);
+        if (bridge) { const [cx, cy] = bow(x1, y1, x2, y2, false); ctx.quadraticCurveTo(cx, cy, x2, y2); } else ctx.lineTo(x2, y2);
+        ctx.stroke(); }
+      ctx.globalAlpha = 1;
+      // dots: memories and work first, then each chart's centre
+      for (const pass of [0, 1]) for (const n of nodes) { if (BIG(n) !== !!pass) continue; const [x, y] = pos.get(n.id); if (x < -80 || y < -60 || x > W + 80 || y > H + 60) continue;
+        const r = nodeR(n), sel = n === hover || n.id === hl, a = lit(n), on = active.has(n.id);
+        ctx.globalAlpha = a;
+        if (BIG(n)) { drawHolo(n, x, y, t, a < 0.5); ctx.globalAlpha = 1; continue; }
+        if (false) {
+          if (on && !calm) { const k = (t % 1600) / 1600; ctx.strokeStyle = hexA(n.color || T.accent, (1 - k) * .55); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, r + 3 + k * 16, 0, Math.PI * 2); ctx.stroke(); }
+          ctx.fillStyle = n.color || T.node; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+          if (sel) { ctx.strokeStyle = "#ffffff"; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, r + 3, 0, Math.PI * 2); ctx.stroke(); }
+          const ty = n.size ? y - n.size * view.k - 34 : y + r + 7;   // charts: a title above the circle; otherwise a name below the dot
+          text(trim(n.label ?? n.id, 18), x, ty, sel ? "#ffffff" : T.text, "600 12.5px " + FONT, a);
+          if (n.sub) text(trim(n.sub, 26), x, ty + 16, T.faintText, "11px " + FONT, a * .9);
+        } else {
+          const col = sel ? "#ffffff" : dotColor(n), big = (n.deg || 0) >= 3;
+          if (big || sel) { ctx.globalCompositeOperation = "lighter"; ctx.globalAlpha = a * (sel ? .9 : .45); ctx.drawImage(sprite(col), x - r * 4, y - r * 4, r * 8, r * 8); ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = a; }
+          ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill();
+          const la = sel || (focus && nb?.has(n.id)) ? 1 : labelAlpha(n);
+          if (a * la > 0.02) { ctx.globalAlpha = a * la; label(trim(n.label ?? n.id, 26), x, y + r + 9, "center", sel ? "#ffffff" : "#a9bcd6", "11px " + FONT); ctx.globalAlpha = 1; }
+        }
+        ctx.globalAlpha = 1; }
+      // the little coloured balls that carry work between charts
+      for (let i = pulses.length - 1; i >= 0; i--) { const p = pulses[i]; p.t += p.v;
+        const a = byId.get(p.a), b = byId.get(p.b); if (!a || !b) { pulses.splice(i, 1); continue; }
+        if (p.t >= 1) { shocks.push({id: p.b, c: p.color, t0: t}); if (p.loop) { p.t = 0; p.trail = []; } else { pulses.splice(i, 1); continue; } }
+        const [x1, y1] = pos.get(p.a), [x2, y2] = pos.get(p.b), u = p.t < .5 ? 2 * p.t * p.t : 1 - Math.pow(-2 * p.t + 2, 2) / 2;
+        const curved = BIG(a) && BIG(b), [cx, cy] = curved ? bow(x1, y1, x2, y2, false) : [(x1 + x2) / 2, (y1 + y2) / 2];
+        const [px, py] = along(x1, y1, cx, cy, x2, y2, u);
+        (p.trail = p.trail || []).push([px, py]); if (p.trail.length > 7) p.trail.shift();
+        p.trail.forEach(([tx, ty], j) => { ctx.globalAlpha = (j + 1) / p.trail.length * .35; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(tx, ty, 2.2, 0, Math.PI * 2); ctx.fill(); });
+        ctx.globalAlpha = 1; ctx.fillStyle = p.color; ctx.beginPath(); ctx.arc(px, py, 3.6, 0, Math.PI * 2); ctx.fill(); }
+      for (let i = shocks.length - 1; i >= 0; i--) { const s2 = shocks[i], age = (t - s2.t0) / 600, n = byId.get(s2.id); if (age > 1 || !n) { shocks.splice(i, 1); continue; }
+        const [x, y] = pos.get(n.id); ctx.globalAlpha = (1 - age) * .6; ctx.strokeStyle = s2.c; ctx.lineWidth = 1.2; ctx.beginPath(); ctx.arc(x, y, nodeR(n) + 2 + age * 14, 0, Math.PI * 2); ctx.stroke(); }
+      ctx.globalAlpha = 1;
+    }
+    const HOLO = "#7fdcff";
+    const holoR = (n) => (n.kind === "hub" ? 15 : n.kind === "top" ? 12 : Math.max(10, 14 - (n.rank || 2) * 0.45)) * Math.max(0.7, Math.min(1.35, view.k));
+    function label(str, x, y, align, color, font) { ctx.font = font; ctx.textAlign = align; ctx.textBaseline = "middle";
+      ctx.shadowColor = "rgba(1,3,10,.95)"; ctx.shadowBlur = 6; ctx.fillStyle = color; ctx.fillText(str, x, y); ctx.fillText(str, x, y); ctx.shadowBlur = 0; }
+    function drawHolo(n, x, y, t, dim) {
+      const R = holoR(n), on = active.has(n.id), sel = n === hover || n.id === hl, col = n.color || HOLO;
+      ctx.globalAlpha = dim ? .22 : 1;
+      ctx.globalCompositeOperation = "lighter";
+      ctx.globalAlpha = (dim ? .1 : on ? .55 : .3); ctx.drawImage(sprite(col), x - R * 2.6, y - R * 2.6, R * 5.2, R * 5.2);
+      ctx.globalCompositeOperation = "source-over"; ctx.globalAlpha = dim ? .22 : 1;
+      // inner ring and core
+      ctx.strokeStyle = hexA(col, sel ? .95 : .6); ctx.lineWidth = 1; ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = hexA(col, .12); ctx.beginPath(); ctx.arc(x, y, R, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = col; ctx.beginPath(); ctx.arc(x, y, R * .26, 0, Math.PI * 2); ctx.fill();
+      ctx.fillStyle = "#fff"; ctx.beginPath(); ctx.arc(x, y, Math.max(1, R * .09), 0, Math.PI * 2); ctx.fill();
+      // rotating arc segments: faster when this member is working
+      const spin = calm ? 0 : t / (on ? 700 : 4200) * (n.kind === "hub" ? -1 : 1);
+      ctx.strokeStyle = hexA(HOLO, on ? .9 : sel ? .7 : .38); ctx.lineWidth = 1.4;
+      for (let i = 0; i < 3; i++) { const a0 = spin + i * 2.094; ctx.beginPath(); ctx.arc(x, y, R + 6, a0, a0 + .9); ctx.stroke(); }
+      // tick ring
+      ctx.strokeStyle = hexA(HOLO, on ? .5 : .2); ctx.lineWidth = 1;
+      ctx.beginPath(); for (let i = 0; i < 36; i++) { const a = i / 36 * Math.PI * 2 - spin * .25, r1 = R + 10, r2 = R + (i % 9 === 0 ? 15 : 12);
+        ctx.moveTo(x + Math.cos(a) * r1, y + Math.sin(a) * r1); ctx.lineTo(x + Math.cos(a) * r2, y + Math.sin(a) * r2); } ctx.stroke();
+      if (n.kind === "hub") {   // the Lead: a targeting reticle
+        const b = R + 22, k2 = 7; ctx.strokeStyle = hexA(HOLO, .55); ctx.lineWidth = 1.2; ctx.beginPath();
+        for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { ctx.moveTo(x + sx * b, y + sy * (b - k2)); ctx.lineTo(x + sx * b, y + sy * b); ctx.lineTo(x + sx * (b - k2), y + sy * b); }
+        ctx.stroke(); ctx.setLineDash([2, 6]); ctx.lineDashOffset = calm ? 0 : t / 60; ctx.strokeStyle = hexA(HOLO, .25); ctx.beginPath(); ctx.arc(x, y, R + 30, 0, Math.PI * 2); ctx.stroke(); ctx.setLineDash([]);
+      }
+      if (n.kind === "top") { ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.beginPath(); ctx.moveTo(x - R - 6, y); ctx.lineTo(x + R + 6, y); ctx.moveTo(x, y - R - 6); ctx.lineTo(x, y + R + 6); ctx.stroke(); }
+      // name and status
+      const ty = n.size ? y - n.size * view.k - 26 : y + R + 22;   // charts: a title above; otherwise a name below the rings
+      label(trim(n.label ?? n.id, 18), x, ty, "center", sel ? "#ffffff" : "#e3ecfa", "600 12.5px " + FONT);
+      if (on || n.sub) label(on ? "working" : trim(n.sub, 26), x, ty + 16, "center", on ? HOLO : "#8fa3c0", "11px " + FONT);
+      ctx.globalAlpha = 1;
+    }
+    /* Colour by what a dot is: memories teal, finished work yellow, work in progress coral, skills violet. */
+    function dotColor(n) { const i = String(n.info || "");
+      if (n.kind === "note") return "#4fd1c5"; if (i.startsWith("skill")) return "#a78bfa"; if (i.startsWith("done")) return "#f6d36b"; return "#f59e7a"; }
+    const n_is = (c, focus, nb) => focus && (c.id === focus || nb?.has(c.id));
+    /* The control point that bows a bridge into an arc: up for some, down for others, so arcs don't stack. */
+    function bow(x1, y1, x2, y2, up) { const mx = (x1 + x2) / 2, my = (y1 + y2) / 2, L = Math.abs(x2 - x1) || Math.hypot(x2 - x1, y2 - y1) || 1;
+      return [mx, my + (up ? -1 : 1) * L * 0.55]; }   // nested rainbows: longer links swing wider
+    const along = (x1, y1, cx, cy, x2, y2, u) => [(1 - u) * (1 - u) * x1 + 2 * (1 - u) * u * cx + u * u * x2, (1 - u) * (1 - u) * y1 + 2 * (1 - u) * u * cy + u * u * y2];
+    let last = 0, settledK = 1;
+    function loop(t) {
+      if (!alive) return; requestAnimationFrame(loop);
+      clock = t; if (o.layout === "solar") updateSolar(t);
+      const busy = alpha >= 0.002 || drag || pulses.length || shocks.length || active.size || dirty;
+      if (typeof document !== "undefined" && document.hidden) return;
+      // Busy: up to 30 frames a second. Idle: 12 a second keeps the stars twinkling and rings turning, lightly.
+      // With reduced motion, only redraw when something changes.
+      if (t - last < (busy ? 33 : calm ? 1e9 : 90)) return;   // idle: a gentle redraw for the drifting sky
+      if (Math.abs(view.k - settledK) / settledK > 0.03) { settledK = view.k; alpha = Math.max(alpha, 0.12); }
+      last = t; step(); draw(t); dirty = false;
+    }
+    requestAnimationFrame(loop);
+
+    const clamp = (k) => Math.max(o.layout === "solar" ? 0.035 : 0.15, Math.min(3.2, k));
+    function hit(sx, sy) { let best = null, bd = 1e9;
+      for (const n of nodes) { const [x0, y0] = toScreen(n), [dx, dy] = drift(n), d = Math.hypot(x0 + dx - sx, y0 + dy - sy), reach = nodeR(n) + (BIG(n) ? 10 : 7);
+        if (d < Math.max(reach, 10) && d < bd) { best = n; bd = d; } }
+      return best; }
+    const local = (e) => { const r = cv.getBoundingClientRect(); return [e.clientX - r.left, e.clientY - r.top]; };
+    function fit() { if (!nodes.length) return; let x0 = 1e9, y0 = 1e9, x1 = -1e9, y1 = -1e9;
+      if (o.layout === "solar") { const R = belt + 40; const ins = Object.assign({l: 0, r: 0, t: 0, b: 0}, typeof o.inset === "function" ? o.inset() : o.inset || {});
+        const aw = Math.max(160, W - ins.l - ins.r), ah = Math.max(160, H - ins.t - ins.b);
+        view.k = clamp(Math.min(aw / (R * 2 + 40), ah / (R * 2 * TILT + 120))); view.x = -((ins.l - ins.r) / 2) / view.k; view.y = 14 - ((ins.t - ins.b) / 2) / view.k; dirty = true; return; }
+      for (const n of nodes) { const r = n.size || 0; x0 = Math.min(x0, n.x - r); y0 = Math.min(y0, n.y - r); x1 = Math.max(x1, n.x + r); y1 = Math.max(y1, n.y + r); }
+      for (const e of edges) { const a = byId.get(e.a), b = byId.get(e.b); if (!a || !b || !BIG(a) || !BIG(b)) continue;   // arcs swing about a quarter of their span
+        y1 = Math.max(y1, a.y + Math.abs(b.x - a.x) * 0.28); }
+      for (const n of nodes) if (BIG(n) && n.size) y0 = Math.min(y0, n.y - n.size - 44);   // room for the titles
+      const ins = Object.assign({l: 0, r: 0, t: 0, b: 0}, typeof o.inset === "function" ? o.inset() : o.inset || {});
+      const aw = Math.max(160, W - ins.l - ins.r), ah = Math.max(160, H - ins.t - ins.b);
+      view.k = clamp(Math.min((aw - 40) / Math.max(1, x1 - x0), (ah - 40) / Math.max(1, y1 - y0)));
+      // centre the content in the open area, not the whole canvas
+      view.x = (x0 + x1) / 2 - ((ins.l - ins.r) / 2) / view.k; view.y = (y0 + y1) / 2 - ((ins.t - ins.b) / 2) / view.k; dirty = true; }
+    function select(n) { hl = n.id; dirty = true; if (n.kind === "note" && o.noteViewer !== false) openNote(n.note.id); if (o.onSelect) o.onSelect(n); }
+    cv.addEventListener("pointerdown", (e) => { cv.setPointerCapture(e.pointerId); const [sx, sy] = local(e); pointers.set(e.pointerId, [sx, sy]);
+      if (pointers.size === 2) { const [p1, p2] = [...pointers.values()]; pinch = {d: Math.hypot(p1[0] - p2[0], p1[1] - p2[1]), k: view.k}; drag = pan = null; return; }
+      const n = hit(sx, sy); if (n) { drag = {n, moved: false}; alpha = Math.max(alpha, .3); } else pan = {sx, sy, x: view.x, y: view.y, moved: false};
+      cv.classList.add("bk-drag"); });
+    cv.addEventListener("pointermove", (e) => { const [sx, sy] = local(e); dirty = true; if (pointers.has(e.pointerId)) pointers.set(e.pointerId, [sx, sy]);
+      if (pinch && pointers.size === 2) { const [p1, p2] = [...pointers.values()]; view.k = clamp(pinch.k * Math.hypot(p1[0] - p2[0], p1[1] - p2[1]) / pinch.d); return; }
+      if (drag) { const [wx, wy] = toWorld(sx, sy); drag.n.x = wx; drag.n.y = wy; drag.moved = true; alpha = Math.max(alpha, .25);
+        if (o.layout === "solar") { drag.n.pinned = true; drag.n.px = wx; drag.n.py = wy; } return; }
+      if (pan) { view.x = pan.x - (sx - pan.sx) / view.k; view.y = pan.y - (sy - pan.sy) / view.k; pan.moved = true; return; }
+      const n = hit(sx, sy); hover = n; cv.style.cursor = n ? "pointer" : "grab";
+      if (n) { tip.style.display = "block"; tip.innerHTML = `<b style="color:${esc(n.color)}">${esc(n.label ?? n.id)}</b><small>${esc(n.info || "")}${n.deg ? (n.info ? " · " : "") + n.deg + " links" : ""}</small>`;
+        tip.style.left = Math.min(W - 270, sx + 14) + "px"; tip.style.top = Math.min(H - 70, sy + 14) + "px"; } else tip.style.display = "none"; });
+    const up = (e) => { pointers.delete(e.pointerId); if (pointers.size < 2) pinch = null;
+      if (drag && !drag.moved) select(drag.n); if (drag && drag.moved) { drag.n.fixed = true; drag.n.userMoved = true; }
+      if (pan && !pan.moved) { hl = null; dirty = true; } drag = pan = null; cv.classList.remove("bk-drag"); };
+    cv.addEventListener("pointerup", up); cv.addEventListener("pointercancel", up);
+    cv.addEventListener("pointerleave", () => { hover = null; dirty = true; tip.style.display = "none"; });
+    cv.addEventListener("dblclick", (e) => { const n = hit(...local(e)); if (n) { n.userMoved = false; n.fixed = false; build(); } });
+    cv.addEventListener("wheel", (e) => { e.preventDefault(); dirty = true; const [sx, sy] = local(e); const [wx, wy] = toWorld(sx, sy);
+      view.k = clamp(view.k * Math.exp(-e.deltaY * 0.0015)); const [nx, ny] = toWorld(sx, sy); view.x += wx - nx; view.y += wy - ny; }, {passive: false});
+    el.querySelector(".bk-zoom").addEventListener("click", (e) => { const z = e.target.dataset?.z; if (!z) return;
+      if (z === "in") view.k = clamp(view.k * 1.25); else if (z === "out") view.k = clamp(view.k / 1.25); else fit(); dirty = true; });
+
+    function openNote(id) { const nt = (o.notes || []).find((x) => x.id === id); if (!nt) return;
+      noteEl.querySelector("b").textContent = nt.title || nt.id; noteEl.querySelector(".bk-nb").innerHTML = markdown(nt.text); noteEl.hidden = false; hl = "note:" + id; dirty = true; }
+    noteEl.querySelector("button").onclick = () => { noteEl.hidden = true; hl = null; dirty = true; };
+    noteEl.querySelector(".bk-nb").addEventListener("click", (e) => { const a = e.target.closest("a[data-note]"); if (a) openNote(a.dataset.note); });
+    const onKey = (e) => { if (e.key === "Escape" && !noteEl.hidden) noteEl.querySelector("button").click(); };
+    document.addEventListener("keydown", onKey);
+
+    build(); setTimeout(fit, 900); setTimeout(fit, 3000);
+    const api = {
+      update(next) { const before = nodes.map((n) => n.id).sort().join(); o = {...o, ...next}; build(); if (nodes.map((n) => n.id).sort().join() !== before) setTimeout(fit, 700); },
+      setActive(ids) { active.clear(); for (const id of ids || []) active.add(id); dirty = true; },
+      pulse(a, b, color, loop = false) { const p = {a, b, t: 0, v: 0.018 + Math.random() * 0.01, color: color || byId.get(a)?.color || "#a68af9", loop}; pulses.push(p);
+        return () => { const i = pulses.indexOf(p); if (i >= 0) pulses.splice(i, 1); }; },
+      burst(id) { const n = byId.get(id); if (!n) return; for (const b of adj.get(id) || []) if (Math.random() < .6) api.pulse(id, b, n.color); alpha = Math.max(alpha, .15); },
+      focus(id) { hl = id; dirty = true; }, fit, openNote,
+      reset() { for (const n of nodes) { n.pinned = false; n.userMoved = false; } if (o.layout === "solar") planSolar(); else build(); hl = null; dirty = true; setTimeout(fit, 30); },
+      /* How many pairs of things overlap on screen right now (cards, note icons with labels). Used by the layout tests. */
+      overlaps() { let count = 0; const pairs = [];
+        for (let i = 0; i < nodes.length; i++) for (let j = i + 1; j < nodes.length; j++) { const a = nodes[i], b = nodes[j], fa = footprint(a), fb = footprint(b);
+          const pad = 6 / (view.k || 1);   // the drawn shapes are smaller than their footprints; allow the spacing margin
+          if (Math.abs(a.x + fa.ox - b.x - fb.ox) < fa.hw + fb.hw - pad * 2 && Math.abs(a.y + fa.oy - b.y - fb.oy) < fa.hh + fb.hh - pad * 2) { count++; if (pairs.length < 5) pairs.push([a.label || a.id, b.label || b.id]); } }
+        return {count, pairs, nodes: nodes.length}; },
+      destroy() { alive = false; ro.disconnect(); document.removeEventListener("keydown", onKey); el.innerHTML = ""; el.classList.remove("bk"); },
+    };
+    return api;
+  }
+
+
+  /* ---------- AI models: connectors + a chat panel ----------
+   * An agent is {label, color, ask(messages, {onText, signal}) -> Promise<text>}; messages are [{role, content}].
+   * Connectors make one:
+   *   Brain.agents.claude(sample, {model:"claude-haiku-5-5"})       on a Claude page (sample = await claude.use("sample"))
+   *   Brain.agents.openai({baseUrl, model, apiKey})                   any OpenAI-style API (DeepSeek, Gemini, OpenRouter, Ollama).
+   *     Use it from your own server or a local app; never ship a real key inside a public web page.
+   */
+  const agents = {
+    claude(sample, cfg = {}) {
+      return async (messages, {onText, signal} = {}) => {
+        const tier = cfg.modelTier || ({"claude-haiku-5-5": "quick", "claude-sonnet-5-5": "default"}[cfg.model] || "complex");
+        const r = await sample(messages, {cache: false, model: cfg.model, modelTier: tier, signal, onText: onText ? ({text}) => onText(text) : undefined});
+        return r.text;
+      };
+    },
+    /* Firefly gateway (server/worker.js): keys stay on the server; it falls back to other AIs and counts usage.
+     *   Brain.agents.gateway({url:"", passcode, model:"gemini:...", fallback:["cloudflare:..."]}) */
+    gateway(cfg) {
+      return async (messages, {signal} = {}) => {
+        const res = await fetch(String(cfg.url || "").replace(/\/$/, "") + "/api/ask", {method: "POST", signal,
+          headers: {"Content-Type": "application/json", Authorization: "Bearer " + (cfg.passcode || "")},
+          body: JSON.stringify({model: cfg.model, fallback: cfg.fallback || [], messages, maxTokens: cfg.maxTokens || 1200})});
+        let data = null; try { data = await res.json(); } catch (e) { data = null; }
+        if (!res.ok) throw {code: data?.error || "HTTP " + res.status, tried: data?.tried};
+        if (cfg.onAnswer) try { cfg.onAnswer(data); } catch (e) { /* display only */ }
+        return data.text;
+      };
+    },
+    openai(cfg) {
+      return async (messages, {signal} = {}) => {
+        const res = await fetch(cfg.baseUrl.replace(/\/$/, "") + "/chat/completions", {method: "POST", signal,
+          headers: {"Content-Type": "application/json", ...(cfg.apiKey ? {Authorization: "Bearer " + cfg.apiKey} : {})},
+          body: JSON.stringify({model: cfg.model, messages, max_tokens: cfg.maxTokens || 1200})});
+        if (!res.ok) throw new Error("HTTP " + res.status);
+        return (await res.json()).choices[0].message.content;
+      };
+    },
+  };
+
+  /* chat(el, brain, {from:{id,label,color}, hub:"lead", agents:{id:{label,color,role,ask}}, rules:"...", delegate:true})
+   * You talk to any agent; the hub can hand up to 3 tasks to the others (lines "ASSIGN <id>: task"), whose reports come back. */
+  function chat(el, brain, cfg) {
+    el.classList.add("bk-chat");
+    el.innerHTML = `<div class="bk-msgs" aria-live="polite"></div><div class="bk-to" role="group" aria-label="Talk to"></div>
+      <form class="bk-in"><textarea rows="1" placeholder="Message…  (Enter to send)" aria-label="Message"></textarea><button type="submit">Send</button></form><div class="bk-note2"></div>`;
+    const box = el.querySelector(".bk-msgs"), to = el.querySelector(".bk-to"), form = el.querySelector("form"), ta = el.querySelector("textarea"), send = form.querySelector("button"), note = el.querySelector(".bk-note2");
+    let A = cfg.agents || {}, ids = Object.keys(A); const log = [];
+    let target = cfg.hub && A[cfg.hub] ? cfg.hub : ids[0], ctl = null; const busy = new Set();
+    const who = (id) => id === cfg.from?.id ? cfg.from : A[id];
+    const nameOf = (m) => (who(m.from)?.label) || m.fromLabel || m.from;
+    const keepIt = (m) => { if (cfg.store?.save && m.text && !m.wait) try { Promise.resolve(cfg.store.save({id: m.id, from: m.from, to: m.to || null, text: m.text.replace(/^\s*\**\s*(ASSIGN|TASK)\s+.*$/gim, "").trim(), tag: m.tag || "", at: m.at, fromLabel: nameOf(m), copy: !!m.copy})).catch(() => {}); } catch (e) {} };
+    function add(from, text, extra = {}) { const m = {id: "m-" + Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 8), from, text, at: new Date().toISOString(), ...extra}; log.push(m); draw(); if (!m.wait) keepIt(m); return m; }
+    function draw() {
+      box.innerHTML = ""; if (!log.length) { box.innerHTML = `<div class="bk-welcome"><h2>What are we making?</h2><p>Start with “we're making…” and the crew splits it into jobs and works them in parallel. Quick questions get a free answer.</p><p>Or pick a crew member below to talk to them directly.</p></div>`; }
+      for (const m of log.slice(-150)) { const w = (m.from === cfg.from?.id && m.fromLabel) ? {label: m.fromLabel, color: cfg.from.color} : who(m.from) || {label: m.fromLabel || m.from, color: "#888"}; const d = document.createElement("div");
+        d.className = "bk-m" + (m.from === cfg.from?.id ? " you" : "") + (m.wait ? " wait" : "");
+        d.innerHTML = `<i style="background:${esc(w.color)}"></i><div style="min-width:0"><b style="color:${esc(w.color)}">${esc(w.label)}</b><small>${esc(m.tag || "")}</small><div class="t"></div></div>`;
+        d.querySelector(".t").textContent = (m.text || "").replace(/^\s*\**\s*(ASSIGN|TASK)\s+.*$/gim, "").replace(/\n{3,}/g, "\n\n").trim() || (m.wait ? "Thinking…" : "");   // dispatch lines are for JEV, not for reading
+        if (m.copy) { const b = document.createElement("button"); b.type = "button"; b.textContent = "Copy"; b.style.cssText = "margin-top:6px;background:none;border:1px solid #3a3a3a;border-radius:5px;color:#ddd;padding:3px 9px;cursor:pointer;font:inherit;font-size:12px";
+          b.onclick = async () => { try { await navigator.clipboard.writeText(m.text.replace(/^Copy this into [^:]+:\n\n/, "")); b.textContent = "Copied"; } catch (x) { const r = document.createRange(); r.selectNodeContents(d.querySelector(".t")); const sl = getSelection(); sl.removeAllRanges(); sl.addRange(r); b.textContent = "Selected: Ctrl/Cmd+C"; } };
+          d.querySelector(".t").after(b); }
+        box.append(d); }
+      box.scrollTop = box.scrollHeight;
+    }
+    function chips() { to.innerHTML = ""; for (const id of ids) { const b = document.createElement("button"); b.type = "button";
+      b.setAttribute("aria-pressed", String(id === target)); b.innerHTML = `<i style="background:${esc(A[id].color)}"></i>@${esc(A[id].label)}`;
+      b.onclick = () => { target = id; chips(); brain.focus(id); ta.focus(); }; to.append(b); } }
+    const history = (id) => log.filter((m) => !m.wait && m.text && (m.from === id || m.to === id)).slice(-10)
+      .map((m) => ({role: m.from === id ? "assistant" : "user", content: m.text}));
+    async function run(id, prompt, tag, from) {
+      const ag = A[id]; busy.add(id); brain.setActive([...busy]); const stop = brain.pulse(from || cfg.from?.id || cfg.hub, id, ag.color, true);
+      const m = add(id, "", {wait: true, tag}); ctl = new AbortController(); send.textContent = "Stop";
+      const sys = `You are ${ag.label}${ag.role ? ", " + ag.role : ""}, on a team led by ${A[cfg.hub]?.label || "the lead"}. ${cfg.rules || ""} Plain English, short.`;
+      const msgs = [{role: "user", content: sys}, {role: "assistant", content: "Understood."}, ...history(id), {role: "user", content: prompt}];
+      const t0 = Date.now(); let ok = true;
+      try { if (ag.relay) { m.text = `Copy this into ${ag.label}:\n\n${sys}\n\n${prompt}\n\n(Paste its answer here with /reply)`; m.copy = true; m.tag = "copy into " + ag.label; }
+        else m.text = await ag.ask(msgs, {signal: ctl.signal, onText: (t) => { m.text = t; m.wait = false; draw(); }});
+        m.wait = false; m.to = from || cfg.from?.id; }
+      catch (e) { ok = false; m.wait = false; m.text = (e?.text || "") + (e?.code === "cancelled" || e?.name === "AbortError" ? " (stopped)" : ` (couldn't reach ${ag.label}${e?.code ? ": " + e.code : ""})`); }
+      finally { stop(); busy.delete(id); brain.setActive([...busy]); ctl = null; send.textContent = "Send"; draw(); keepIt(m);
+        try { cfg.onRun && !ag.relay && cfg.onRun({id, ok, ms: Date.now() - t0}); } catch (x) {} }
+      return ok ? m.text : "";
+    }
+    form.addEventListener("submit", async (e) => { e.preventDefault(); if (ctl) { ctl.abort(); return; }
+      const text = ta.value.trim(); if (!text || !A[target]) return; ta.value = "";
+      if (/^\/reply\s/i.test(text) && A[target].relay) { add(target, text.replace(/^\/reply\s+/i, ""), {to: cfg.from?.id, tag: "reply"}); cfg.onRun && cfg.onRun({id: target, ok: true, ms: 0}); return; }
+      add(cfg.from?.id || "you", text, {to: target, tag: "to " + A[target].label});
+      /* Quick lane: before the Lead spends anything, a simple question may be answered for free (no AI, a remembered
+       * answer, or a free model). cfg.quick(text) -> {text, tag, label} or null to carry on as normal. */
+      /* Kitchen: an order ("we're making ...") goes to the server's kitchen. cfg.order(text, update) -> true if taken;
+       * update(text, tag) rewrites the kitchen's message in place as tickets cook. */
+      if (target === cfg.hub && cfg.order) {
+        const k = add("kitchen", "", {wait: true, fromLabel: "Kitchen"}); let took = false;
+        const update = (t, tag, id) => { if (id) k.id = id; k.text = t; k.wait = false; if (tag) k.tag = tag; k.to = cfg.from?.id; draw(); keepIt(k); };   // id: one saved message per order
+        try { took = await cfg.order(text, update); } catch (x) { took = false; }
+        if (took) return;
+        log.splice(log.indexOf(k), 1); draw();
+      }
+      if (target === cfg.hub && cfg.quick) {
+        const q = add("quick", "", {wait: true, fromLabel: "Quick answer"}); let r = null;
+        try { r = await cfg.quick(text); } catch (x) { r = null; }
+        if (r?.text) { q.text = r.text; q.wait = false; q.tag = r.tag || ""; q.fromLabel = r.label || "Quick answer"; q.to = cfg.from?.id; draw(); keepIt(q); return; }
+        log.splice(log.indexOf(q), 1); draw();
+      }
+      const D = cfg.dispatch;
+      const roster = ids.filter((x) => x !== cfg.hub).map((x) => `${x} = ${A[x].label}${A[x].role ? ": " + A[x].role : ""}`).join("\n");
+      const hand = target === cfg.hub && cfg.delegate !== false && roster
+        ? (D ? `\n\nYou lead the team. Reshape this into clear, precise tasks. If any part should be done by the team, end with up to 3 lines exactly "TASK <kind>: <task>", where kind is one of: ${D.kinds.join(", ")}. The dispatcher (JEV) picks who does each one.`
+             : `\n\nYou lead the team. If part of this is better done by a member, end with up to 3 lines exactly "ASSIGN <id>: <task>" using:\n${roster}`) : "";
+      const out = await run(target, text + hand, "", cfg.from?.id);
+      if (!hand || !out) return;
+      const jobs = []; const clean = out.split("\n").filter((l) => {
+        const t = l.match(/^\s*\**\s*TASK\s+([\w-]+)\s*\**\s*:\s*(.+)$/i), a = l.match(/^\s*\**\s*ASSIGN\s+@?([\w-]+)\s*\**\s*:\s*(.+)$/i);
+        if (jobs.length >= 3 || !(t || a)) return !(t || a);
+        const task = (t || a)[2].replace(/^[\s*]+|[\s*]+$/g, "");
+        if (t && D) { const kind = t[1].toLowerCase(); const r = D.route(kind, task) || {}; if (A[r.id]) jobs.push({id: r.id, task, kind, why: r.reason || ""}); }
+        else if (a && A[a[1]] && a[1] !== cfg.hub) jobs.push({id: a[1], task, kind: "", why: ""});
+        return false; }).join("\n").trim();
+      const last = log.filter((m) => m.from === cfg.hub).pop(); if (last) { last.text = clean + (jobs.length ? `\n\nHanding out: ${jobs.map((j) => A[j.id].label + (j.kind ? " (" + j.kind + ")" : "")).join(", ")}.` : ""); draw(); keepIt(last); }
+      for (const j of jobs) {
+        const res = await run(j.id, `Task from ${A[cfg.hub].label}: ${j.task}\n(The original request: ${text.slice(0, 400)})\nReport back in under 150 words.`, (D ? "JEV → " : "report to ") + (D ? (j.kind || "task") : A[cfg.hub].label), cfg.hub);
+        try { cfg.onTask && cfg.onTask({member: j.id, kind: j.kind, task: j.task, why: j.why, text: res, request: text.slice(0, 400), relay: !!A[j.id].relay}); } catch (x) {} }
+    });
+    ta.addEventListener("keydown", (e) => { if (e.key === "Enter" && !e.shiftKey) { e.preventDefault(); form.requestSubmit(); } });
+    chips(); draw();
+    if (cfg.store?.load) Promise.resolve(cfg.store.load()).then((old) => { if (Array.isArray(old) && old.length) { log.unshift(...old.filter((m) => m && m.text)); draw(); } }).catch(() => {});
+    return {say: (text) => { ta.value = text; form.requestSubmit(); }, status: (t) => { note.textContent = t || ""; },
+      setTarget: (id) => { if (!A[id]) return; target = id; chips(); ta.focus(); },
+      setFrom: (f) => { Object.assign(cfg.from, f); draw(); }, clear: () => { log.length = 0; draw(); },
+      setAgents: (next, hub) => { A = next || {}; ids = Object.keys(A); if (hub) cfg.hub = hub; if (!A[target]) target = cfg.hub && A[cfg.hub] ? cfg.hub : ids[0]; chips(); draw(); },
+      replaceLog: (msgs) => { log.length = 0; log.push(...(msgs || []).filter((m) => m && m.text)); draw(); }, log};
+  }
+
+  /* store({url, passcode, project, fetch?, pollMs?}): the Firefly server's database (server/store.js) with the same
+   * shape as the storage a Claude page uses: db.collection(name).add / doc(id).set|update|delete / orderBy / limit /
+   * get / onSnapshot. Changes show at once on this page and reach the server in order; other devices appear on the
+   * next poll. */
+  function store(cfg) {
+    const f = cfg.fetch || ((...a) => fetch(...a));
+    const base = String(cfg.url || "").replace(/\/$/, "") + "/api/db/" + encodeURIComponent(cfg.project);
+    const headers = {"Content-Type": "application/json", Authorization: "Bearer " + (cfg.passcode || "")};
+    const data = new Map(), subs = new Set(), queue = new Map(), sigs = new Map();
+    let loaded = null, timer = null, pending = 0;
+    const col = (name) => { if (!data.has(name)) data.set(name, new Map()); return data.get(name); };
+    const newId = () => Date.now().toString(36) + "-" + Math.random().toString(36).slice(2, 10);
+    function snap(name, order, limit) {
+      let rows = [...col(name).entries()];
+      if (order) rows.sort((a, b) => { const x = String(a[1][order.field] ?? ""), y = String(b[1][order.field] ?? ""); return order.dir === "desc" ? y.localeCompare(x) : x.localeCompare(y); });
+      if (limit) rows = rows.slice(0, limit);
+      return {docs: rows.map(([id, d]) => ({id, data: () => ({...d})})), size: rows.length, empty: !rows.length};
+    }
+    const tell = (name) => { for (const s of subs) if (!name || s.name === name) try { s.cb(snap(s.name, s.order, s.limit)); } catch (e) { /* a broken listener must not stop others */ } };
+    async function load() {
+      const r = await f(base, {headers});
+      if (!r.ok) { let e = null; try { e = await r.json(); } catch (x) { e = null; } throw {code: e?.error || "HTTP " + r.status, status: r.status}; }
+      const body = await r.json();
+      if (pending) return;                     // don't overwrite changes still on their way to the server
+      const changed = [];
+      for (const [name, docs] of Object.entries(body.collections || {})) {
+        const m = new Map(); for (const d of docs) m.set(d.id, d.data);
+        const sig = sigOf(m);
+        if (sigs.get(name) !== sig || !data.has(name)) { sigs.set(name, sig); data.set(name, m); changed.push(name); }
+      }
+      for (const name of changed) tell(name);   // only redraw what changed, so a half-typed form survives a poll
+    }
+    const ready = () => loaded || (loaded = load());
+    function send(name, op, id, d) {
+      pending++;
+      const prev = queue.get(name) || Promise.resolve();
+      const next = prev.catch(() => {}).then(async () => {
+        const r = await f(base + "/" + encodeURIComponent(name), {method: "POST", headers, body: JSON.stringify({op, id, data: d})});
+        if (!r.ok) { let e = null; try { e = await r.json(); } catch (x) { e = null; } throw {code: e?.error || "HTTP " + r.status}; }
+        return r.json();
+      }).finally(() => { pending--; });
+      queue.set(name, next);
+      next.catch(() => { if (cfg.onError) cfg.onError(name); loaded = null; ready().catch(() => {}); });
+      return next;
+    }
+    function query(name, order, limit) {
+      return {
+        orderBy: (field, dir = "asc") => query(name, {field, dir}, limit),
+        limit: (n) => query(name, order, n),
+        get: async () => { await ready(); return snap(name, order, limit); },
+        onSnapshot(cb, err) { const s = {name, order, limit, cb}; subs.add(s); ready().then(() => cb(snap(name, order, limit))).catch((e) => err && err(e)); return () => subs.delete(s); },
+      };
+    }
+    const sigOf = (m) => JSON.stringify([...m.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1)));
+    const touched = (name) => { sigs.set(name, sigOf(col(name))); tell(name); };   // a change made here: redraw now; the next poll won't count it again
+    function collection(name) {
+      return Object.assign(query(name), {
+        async add(d) { const id = newId(); col(name).set(id, {...d}); touched(name); await send(name, "set", id, d); return {id}; },
+        doc: (id) => ({
+          id,
+          async set(d) { col(name).set(id, {...d}); touched(name); await send(name, "set", id, d); },
+          async update(d) { col(name).set(id, {...(col(name).get(id) || {}), ...d}); touched(name); await send(name, "update", id, d); },
+          async delete() { col(name).delete(id); touched(name); await send(name, "delete", id); },
+          async get() { await ready(); const v = col(name).get(id); return {id, exists: !!v, data: () => (v ? {...v} : undefined)}; },
+        }),
+      });
+    }
+    function poll(ms) { clearInterval(timer); timer = setInterval(() => { if (typeof document === "undefined" || !document.hidden) load().catch(() => {}); }, ms); }
+    if (cfg.pollMs) poll(cfg.pollMs);
+    return {collection, ready, refresh: load, stop: () => clearInterval(timer)};
+  }
+
+  /* Escalation: a free model is told it may hand a job up instead of guessing. Its reply "ESCALATE: <why>" sends the
+   * job to the hard tier. Anything else is a normal answer. */
+  const escalation = {
+    instruction: "If this job is beyond you (it needs careful reasoning, real code, exact numbers, or you are unsure), do not guess: reply with exactly one line, ESCALATE: <the reason in a few words>.",
+    parse(text) {
+      const m = /^\s*\**\s*ESCALATE\s*\**\s*:\s*(.*)$/im.exec(String(text || ""));
+      if (!m) return null;
+      const before = String(text).slice(0, m.index).trim();
+      return before.length > 200 ? null : {reason: m[1].trim().slice(0, 160) || "needs a stronger model"};   // a long answer that merely mentions it is still an answer
+    },
+    withInstruction(messages) {
+      const out = messages.map((m) => ({...m})); const i = out.findIndex((m) => m.role === "user");
+      if (i >= 0) out[i].content = out[i].content + "\n\n" + escalation.instruction; else out.unshift({role: "user", content: escalation.instruction});
+      return out;
+    },
+  };
+
+  /* zip([{name, text}]) -> Uint8Array: a plain (uncompressed) .zip, e.g. a folder of notes for Obsidian. */
+  const CRC = (() => { const t = new Uint32Array(256); for (let n = 0; n < 256; n++) { let c = n; for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1; t[n] = c >>> 0; } return t; })();
+  const crc32 = (b) => { let c = 0xffffffff; for (let i = 0; i < b.length; i++) c = CRC[(c ^ b[i]) & 255] ^ (c >>> 8); return (c ^ 0xffffffff) >>> 0; };
+  function zip(files, when = new Date()) {
+    const enc = new TextEncoder(), parts = [], central = []; let offset = 0;
+    const time = (when.getHours() << 11) | (when.getMinutes() << 5) | (when.getSeconds() >> 1);
+    const date = ((Math.max(1980, when.getFullYear()) - 1980) << 9) | ((when.getMonth() + 1) << 5) | when.getDate();
+    for (const f of files) {
+      const name = enc.encode(f.name), body = enc.encode(f.text ?? ""), crc = crc32(body);
+      const head = new DataView(new ArrayBuffer(30));
+      [[0, 0x04034b50, 4], [4, 20, 2], [6, 0x0800, 2], [8, 0, 2], [10, time, 2], [12, date, 2], [14, crc, 4], [18, body.length, 4], [22, body.length, 4], [26, name.length, 2], [28, 0, 2]]
+        .forEach(([o, v, n]) => (n === 4 ? head.setUint32(o, v, true) : head.setUint16(o, v, true)));
+      const cen = new DataView(new ArrayBuffer(46));
+      [[0, 0x02014b50, 4], [4, 20, 2], [6, 20, 2], [8, 0x0800, 2], [10, 0, 2], [12, time, 2], [14, date, 2], [16, crc, 4], [20, body.length, 4], [24, body.length, 4], [28, name.length, 2], [30, 0, 2], [32, 0, 2], [34, 0, 2], [36, 0, 2], [38, 0, 4], [42, offset, 4]]
+        .forEach(([o, v, n]) => (n === 4 ? cen.setUint32(o, v, true) : cen.setUint16(o, v, true)));
+      parts.push(new Uint8Array(head.buffer), name, body); central.push(new Uint8Array(cen.buffer), name);
+      offset += 30 + name.length + body.length;
+    }
+    const size = central.reduce((n, p) => n + p.length, 0), end = new DataView(new ArrayBuffer(22));
+    [[0, 0x06054b50, 4], [4, 0, 2], [6, 0, 2], [8, files.length, 2], [10, files.length, 2], [12, size, 4], [16, offset, 4], [20, 0, 2]]
+      .forEach(([o, v, n]) => (n === 4 ? end.setUint32(o, v, true) : end.setUint16(o, v, true)));
+    const all = [...parts, ...central, new Uint8Array(end.buffer)], out = new Uint8Array(all.reduce((n, p) => n + p.length, 0));
+    let at = 0; for (const p of all) { out.set(p, at); at += p.length; }
+    return out;
+  }
+  /* A note title -> a safe file name Obsidian will still link to by the same title. */
+  const noteFile = (title) => String(title || "note").replace(/[\\/:*?"<>|#^[\]]/g, "-").trim().slice(0, 120) + ".md";
+
+  const Brain = {mount, markdown, chat, agents, store, escalation, zip, noteFile};
+  if (typeof module !== "undefined" && module.exports) module.exports = Brain; else root.Brain = Brain;
+})(typeof window !== "undefined" ? window : this);
+</script>
+<script>
+(() => {
+"use strict";
+const $ = (id) => document.getElementById(id);
+function toast(text) { let t = $("toast"); if (!t) { t = document.createElement("div"); t.id = "toast"; t.setAttribute("role", "status"); document.body.append(t); }
+  t.textContent = text; t.classList.add("on"); clearTimeout(toast.t); toast.t = setTimeout(() => t.classList.remove("on"), 4000); }
+const esc = (s) => String(s ?? "").replace(/[&<>"]/g, (c) => ({"&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;"}[c]));
+const slug = (s) => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "x";
+const ago = (iso) => { const t = Date.parse(iso); if (!t) return ""; const s = (Date.now() - t) / 1000; return s < 60 ? "now" : s < 3600 ? Math.floor(s / 60) + "m" : s < 86400 ? Math.floor(s / 3600) + "h" : Math.floor(s / 86400) + "d"; };
+
+/* Models a member can think with. Claude models run on the viewer's own Claude account; "outside" AIs (ChatGPT, Gemini,
+   DeepSeek, a local model) are relayed by copy and /reply because this page can't reach other services. */
+const MODELS = {
+  "claude-haiku-5-5": {name: "Haiku 5.5", color: "#4fbf8b", note: "fast, lightest on your usage"},
+  "claude-sonnet-5-5": {name: "Sonnet 5.5", color: "#5a9fd6", note: "balanced"},
+  "claude-opus-5-5": {name: "Opus 5.5", color: "#8b6cef", note: "strongest, heaviest on your usage"},
+  "outside": {name: "Outside AI", color: "#9a9a9a", note: "copy and /reply"},
+};
+/* Firefly gateway AIs ("provider:model"). Run through server/worker.js, which holds the keys. The list lives in
+   data/config/ai.json; names marked check:true should be confirmed against the provider's current model list. */
+const AI_DEFAULT = {"about":"AIs the Firefly server can use. id is provider:model. Cloudflare model names confirmed in Cloudflare's docs on 2026-11-08 (Hermes 2 Pro and Llama 3.1 8B are being retired). check:true means confirm the exact name in that provider's model list. Tiers are what members pick: easy = free first, hard = paid first (then free if no paid AI answers).","models":[{"id":"cloudflare:@cf/meta/llama-3.3-70b-instruct-fp8-fast","name":"Llama 3.3 70B fast (Cloudflare)","cost":"free daily allowance, no key"},{"id":"cloudflare:@cf/meta/llama-4-scout-17b-16e-instruct","name":"Llama 4 Scout (Cloudflare)","cost":"free daily allowance, no key"},{"id":"cloudflare:@cf/openai/gpt-oss-20b","name":"gpt-oss 20B (Cloudflare)","cost":"free daily allowance, no key"},{"id":"cloudflare:@hf/nousresearch/hermes-2-pro-mistral-7b","name":"Hermes 2 Pro (Cloudflare, being retired)","cost":"free, no key"},{"id":"openrouter:nousresearch/hermes-3-llama-3.1-405b:free","name":"Hermes 3 405B (OpenRouter)","cost":"free, needs a free OpenRouter key","check":true},{"id":"gemini:gemini-2.5-flash","name":"Gemini Flash","cost":"free daily allowance, needs a key","check":true},{"id":"deepseek:deepseek-chat","name":"DeepSeek Chat","cost":"cheap, paid key","check":true},{"id":"openai:gpt-4o-mini","name":"ChatGPT mini","cost":"cheap, paid key","check":true},{"id":"anthropic:claude-haiku-5-5","name":"Claude Haiku 5.5 (API)","cost":"cheap, paid key"},{"id":"anthropic:claude-sonnet-5-5","name":"Claude Sonnet 5.5 (API)","cost":"medium, paid key"},{"id":"anthropic:claude-opus-5-5","name":"Claude Opus 5.5 (API)","cost":"expensive, paid key"}],"tiers":{"easy":["cloudflare:@cf/meta/llama-3.3-70b-instruct-fp8-fast","cloudflare:@cf/meta/llama-4-scout-17b-16e-instruct","openrouter:nousresearch/hermes-3-llama-3.1-405b:free","cloudflare:@cf/openai/gpt-oss-20b","gemini:gemini-2.5-flash","cloudflare:@hf/nousresearch/hermes-2-pro-mistral-7b"],"hard":["anthropic:claude-sonnet-5-5","openai:gpt-4o-mini","deepseek:deepseek-chat","gemini:gemini-2.5-flash","cloudflare:@cf/meta/llama-3.3-70b-instruct-fp8-fast"]},"fallback":["cloudflare:@cf/meta/llama-3.3-70b-instruct-fp8-fast","cloudflare:@cf/meta/llama-4-scout-17b-16e-instruct"]};
+const GW = {url: "", pass: "", status: null, last: null};
+try { GW.url = localStorage.getItem("firefly-url") || ""; GW.pass = localStorage.getItem("firefly-pass") || ""; } catch (e) { /* private window */ }
+const PROVIDER_COLORS = {anthropic: "#c58a5a", openai: "#9a9a9a", gemini: "#6f9cf2", openrouter: "#b48cf2", deepseek: "#6b8fd6", cloudflare: "#f2a05a"};
+let AI = AI_DEFAULT;
+function loadAi(ai) {
+  AI = ai && Array.isArray(ai.models) ? ai : AI_DEFAULT;
+  for (const [t, chain] of Object.entries(AI.tiers || {})) MODELS["tier:" + t] = {name: t === "easy" ? "Easy (free first)" : t === "hard" ? "Hard (paid first)" : "Tier: " + t,
+    color: t === "easy" ? "#4fbf8b" : "#e0a458", note: chain.length + " AIs, tried in order", gateway: true};
+  for (const m of AI.models) MODELS[m.id] = {name: m.name || m.id, color: PROVIDER_COLORS[m.id.split(":")[0]] || "#9a9a9a", note: (m.cost || "") + (m.check ? " · check name" : ""), gateway: true};
+}
+const isGateway = (model) => /^[a-z]+:/.test(model || "");
+const QuickRules = (() => {
+/* Quick rules: answers that need no AI at all, and a test for "is this a simple question a free model can take?".
+ * Shared by the server (imported) and the page (inlined by scripts/build.mjs), so the page can answer greetings, maths
+ * and the time instantly without even calling the server. Pure functions, no dependencies. */
+
+function normalize(text) {
+  return String(text || "").toLowerCase().replace(/[’']/g, "'").replace(/\s+/g, " ").trim().replace(/[\s?!.]+$/, "");
+}
+
+/* ---- safe arithmetic: numbers, + - * / % ^ ( ), "x% of y". No eval. ---- */
+function tokens(src) {
+  const out = []; let i = 0;
+  while (i < src.length) {
+    const c = src[i];
+    if (c === " ") { i++; continue; }
+    const num = /^(\d+(?:\.\d+)?|\.\d+)/.exec(src.slice(i));
+    if (num) { out.push({n: parseFloat(num[1])}); i += num[1].length; continue; }
+    if ("+-*/^()".includes(c)) { out.push({op: c}); i++; continue; }
+    return null;
+  }
+  return out;
+}
+function calculate(expr) {
+  let src = String(expr || "").toLowerCase().replace(/,(?=\d{3})/g, "").replace(/×|x(?=\s*[\d(])/g, "*").replace(/÷/g, "/").replace(/\*\*/g, "^")
+    .replace(/\bplus\b/g, "+").replace(/\bminus\b/g, "-").replace(/\b(times|multiplied by)\b/g, "*").replace(/\bdivided by\b/g, "/").trim();
+  const pct = /^(\d+(?:\.\d+)?)\s*%\s*of\s*(\d+(?:\.\d+)?)$/.exec(src);
+  if (pct) return tidy(parseFloat(pct[1]) / 100 * parseFloat(pct[2]));
+  if (src.length > 80 || !/\d/.test(src) || !/[+\-*/^]/.test(src.replace(/^-/, ""))) return null;
+  const t = tokens(src); if (!t || !t.length) return null;
+  let p = 0;
+  const peek = () => t[p], take = () => t[p++];
+  function primary() {
+    const k = take(); if (!k) throw 0;
+    if (k.n != null) return k.n;
+    if (k.op === "-") return -primary();
+    if (k.op === "+") return primary();
+    if (k.op === "(") { const v = sum(); if (take()?.op !== ")") throw 0; return v; }
+    throw 0;
+  }
+  function power() { const b = primary(); if (peek()?.op === "^") { take(); return Math.pow(b, power()); } return b; }
+  function product() { let v = power(); while (peek() && "*/".includes(peek().op)) { const o = take().op, r = power(); if (o === "/" && r === 0) throw 0; v = o === "*" ? v * r : v / r; } return v; }
+  function sum() { let v = product(); while (peek() && "+-".includes(peek().op)) { const o = take().op, r = product(); v = o === "+" ? v + r : v - r; } return v; }
+  try { const v = sum(); if (p !== t.length || !Number.isFinite(v)) return null; return tidy(v); } catch { return null; }
+}
+function tidy(v) { if (!Number.isFinite(v)) return null; const r = Math.round(v * 1e10) / 1e10; return Math.abs(r) >= 1e15 ? r.toExponential(6) : String(r); }
+
+/* ---- answers that need no AI ---- */
+const pick = (list, seed) => list[Math.abs(seed) % list.length];
+const hash = (s) => [...s].reduce((h, c) => (h * 31 + c.charCodeAt(0)) | 0, 7);
+
+/* ctx: {members:[{name, job}], now: Date, lead: "Lead", local: true when run in the page (local time is known)} */
+function instant(text, ctx = {}) {
+  const q = normalize(text); if (!q || q.length > 160) return null;
+  const now = ctx.now || new Date(), h = hash(q);
+  if (/^(hi|hey|hello|hiya|yo|sup|howdy|gm|good (morning|afternoon|evening)|hey there|hi there|hello there)( (team|everyone|all|firefly|guys))?$/.test(q))
+    return pick(["Hi! What are we working on?", "Hey. What do you want to get done?", "Hello! Tell me what you need and I'll get the team on it."], h);
+  if (/^(thanks|thank you|thx|ty|cheers|thanks a lot|thank you so much|appreciate it|much appreciated)( (team|everyone|all|lead))?$/.test(q))
+    return pick(["You're welcome.", "Any time.", "Happy to help."], h);
+  if (/^(ok|okay|k|cool|nice|great|perfect|awesome|got it|sounds good|alright|lol|haha)$/.test(q)) return "Got it.";
+  if (/^(bye|goodbye|good night|gn|see you|see ya|later|cya)$/.test(q)) return "See you. Everything's saved for next time.";
+  if (/^(how are you|how're you|how are you doing|how's it going|what's up|whats up|wassup)$/.test(q)) return "All good and ready to work. What's next?";
+  if (/^(are you there|you there|anyone there|hello\?*)$/.test(q)) return "Yes, here. What do you need?";
+  if (/^(who are you|what are you|what is this|what's this|what is firefly|what's firefly|what can you do|what do you do|help|what can i ask|how does this work|how do i use this)$/.test(q)) {
+    const team = (ctx.members || []).map((m) => m.name).filter(Boolean);
+    return `This is Firefly: a team of AIs working together. You talk to the ${ctx.lead || "Lead"}, who splits your request into tasks and hands them out${team.length ? ` to ${team.join(", ")}` : ""}. Simple questions get a quick free answer; real work goes to the team. Try "write a launch tweet" or "research three competitors".`;
+  }
+  if (/^(what time is it|what's the time|whats the time|time|current time|what time is it now|tell me the time)$/.test(q)) {
+    const t = ctx.local ? now.toLocaleTimeString([], {hour: "numeric", minute: "2-digit"}) : now.toISOString().slice(11, 16) + " UTC";
+    return `It's ${t}.`;
+  }
+  if (/^(what's the date|whats the date|what is the date|what day is it|what's today's date|today's date|what is today|date|what's today|what day is today)$/.test(q)) {
+    const d = ctx.local ? now.toLocaleDateString([], {weekday: "long", year: "numeric", month: "long", day: "numeric"}) : now.toISOString().slice(0, 10) + " (UTC)";
+    return `Today is ${d}.`;
+  }
+  const math = /^(?:what(?:'s| is)|whats|calculate|calc|compute|solve|how much is|=)?\s*(.+?)(?:\s*=)?$/.exec(q);
+  if (math) { const v = calculate(math[1]); if (v != null) return `${math[1].replace(/\s+/g, " ")} = ${v}`; }
+  return null;
+}
+
+/* ---- is this a short, general question a free model can answer on its own? ---- */
+const WORK = /\b(build|make|create|write|draft|design|code|program|fix|debug|deploy|implement|plan|research|analy[sz]e|compare|review|critique|summari[sz]e|translate|generate|launch|edit|rewrite|improve|optimi[sz]e|set ?up|configure|refactor|test|audit|strategy|list of|step by step)\b/;
+const PERSONAL = /\b(my|our|we|us|i've|i have|this project|the project|the team|you guys|firefly's|notes?|tasks?|vault)\b/;
+const LIVE = /\b(today|tonight|now|current(ly)?|latest|newest|recent|this (week|month|year)|price|prices|cost of|weather|news|stock|score|who won|trending|live)\b/;
+const MONEY = /\b(money|pay|spend|budget|password|api key|private key|seed phrase|wallet|invest|buy|sell)\b/;
+function looksSimple(text) {
+  const q = normalize(text);
+  if (q.length < 3 || q.length > 220 || q.split(" ").length > 40) return false;
+  if (/\n/.test(String(text).trim())) return false;
+  if (WORK.test(q) || PERSONAL.test(q) || LIVE.test(q) || MONEY.test(q)) return false;
+  const questiony = /\?\s*$/.test(String(text).trim()) || /^(what|who|when|where|why|how|which|is|are|was|were|do|does|did|can|could|should|would|will|define|meaning of|explain|tell me|whats|what's|who's|how's|difference between)\b/.test(q);
+  return questiony;
+}
+
+/* A free model's reply that hands the question back ("ESCALATE ...") means: give it to the team instead. */
+function isHandBack(text) {
+  return /^\s*\**\s*ESCALATE\b/i.test(String(text || "")) || !String(text || "").trim();
+}
+
+const QUICK_PROMPT = "You are Firefly's quick helper. Answer the question in at most three short sentences of plain English, no preamble. If it needs real work (building, long writing, research, planning, anything about the user's own project), current information, or you are not sure, reply with exactly: ESCALATE";
+
+return {normalize, calculate, instant, looksSimple, isHandBack};
+})();
+/* A member's model -> the order of AIs to try. "tier:easy" expands to the free list; a single AI gets the backups after it. */
+function chainFor(model) {
+  const tier = /^tier:(.+)$/.exec(model || "");
+  const list = tier ? (AI.tiers?.[tier[1]] || []) : [model, ...(AI.fallback || [])];
+  return [...new Set(list.filter(Boolean))];
+}
+const gwOn = () => !!GW.pass;
+loadAi(AI_DEFAULT);
+const COLORS = ["#8b6cef", "#e6d36b", "#5ad6a6", "#6fb7ff", "#ffb36b", "#ff8fd8", "#b9f27c", "#ff7088", "#4fe0c3", "#c9a0ff", "#ffd2a6", "#8ee7ff"];
+
+/* The starter brain: a general team any project can begin from. Written into this page's storage on first use. */
+const STARTER = {
+  members: [
+    {id: "lead", name: "Lead", color: "#8b6cef", job: "Runs the team: turns requests into clear tasks and decides what happens next.", model: "claude-sonnet-5-5", skills: ["plain-english"], hub: true},
+    {id: "researcher", name: "Researcher", color: "#e6d36b", job: "Finds facts, trends and sources.", model: "claude-haiku-5-5", skills: ["cite-sources"]},
+    {id: "analyst", name: "Analyst", color: "#5ad6a6", job: "Works with numbers, data and tests.", model: "claude-sonnet-5-5", skills: ["show-the-math"]},
+    {id: "builder", name: "Builder", color: "#6fb7ff", job: "Plans and writes code and tools.", model: "claude-haiku-5-5", skills: []},
+    {id: "writer", name: "Writer", color: "#ffb36b", job: "Writes copy, names, posts and summaries.", model: "claude-haiku-5-5", skills: ["plain-english"]},
+    {id: "critic", name: "Critic", color: "#ff7088", job: "Finds the flaws in any plan before it ships.", model: "claude-sonnet-5-5", skills: ["red-team"]},
+    {id: "checker", name: "Checker", color: "#b9f27c", job: "Checks rules, safety, privacy and money risks.", model: "claude-haiku-5-5", skills: ["red-team"]},
+  ],
+  skills: [
+    {id: "plain-english", name: "Plain English", text: "Write for a non-expert. Short sentences, no jargon, the main point first."},
+    {id: "cite-sources", name: "Cite sources", text: "Give a source for every fact. Mark anything you can't check as UNVERIFIED and say how to check it."},
+    {id: "show-the-math", name: "Show the math", text: "Show the numbers and how you got them. Say what data would change the answer."},
+    {id: "red-team", name: "Red team", text: "Give the strongest 2-3 objections, each with the evidence that would change your mind."},
+  ],
+  jev: {
+    sensitive: ["money", "pay", "spend", "budget", "password", "api key", "private key", "seed", "wallet", "sign", "approve", "delete", "contract"],
+    rules: [
+      {kind: "research", member: "researcher", words: ["research", "find", "look up", "trend", "source", "compare", "competitor"]},
+      {kind: "numbers", member: "analyst", words: ["number", "data", "stat", "measure", "cost", "price", "average", "test"]},
+      {kind: "build", member: "builder", words: ["build", "code", "fix", "bug", "page", "script", "app", "tool"]},
+      {kind: "write", member: "writer", words: ["write", "draft", "copy", "post", "name", "slogan", "summar"]},
+      {kind: "review", member: "critic", words: ["review", "critique", "flaw", "risk", "weak", "second opinion"]},
+      {kind: "safety", member: "checker", words: ["rule", "legal", "safe", "privacy", "policy", "terms"]},
+    ],
+  },
+  notes: [
+    {id: "Home", text: "# Home\n\nThis project's shared memory. Every member reads it.\n\n- How the brain works: [[How this brain works]]\n- What we've learned: [[Lessons]]\n- Decisions so far: [[Decisions]]"},
+    {id: "How this brain works", text: "# How this brain works\n\n1. You tell the **Lead** what you want.\n2. The Lead reshapes it into clear tasks, each with a kind (research, build, write...).\n3. **JEV** (the dispatcher) sends each task to the right member by its rules: no AI needed, so it costs nothing.\n4. Anything about money, keys or approvals stays with the Lead and needs your yes.\n5. Reports come back in the chat; grade them in Tasks so the performance review stays honest.\n\nBack: [[Home]]"},
+    {id: "Lessons", text: "# Lessons\n\n- (Add what the team learns here.)\n\nBack: [[Home]]"},
+    {id: "Decisions", text: "# Decisions\n\n- (Add decisions with the date and who made them.)\n\nBack: [[Home]]"},
+  ],
+};
+
+const S = {members: [], skills: [], notes: [], tasks: [], usage: [], chat: [], jev: STARTER.jev, project: {name: "Firefly", owner: "Owner"},
+  me: {id: null, name: "", owner: true}, canEdit: true, live: false, loaded: false};
+let db = null, sample = null;
+const sampleP = (window.claude?.use ? window.claude.use("sample") : Promise.resolve(null)).catch(() => null);
+
+/* ---------- JEV: routes a task kind to a member by rules; sensitive words keep it with the Lead ---------- */
+const hubId = () => (S.members.find((m) => m.hub) || S.members[0] || {}).id;
+function jevRoute(kind, task) {
+  const t = String(task || "").toLowerCase();
+  const hit = (S.jev.sensitive || []).find((w) => w && t.includes(w.toLowerCase()));
+  if (hit) return {id: hubId(), reason: `mentions "${hit}": stays with the Lead and needs the owner's yes`};
+  const byKind = (S.jev.rules || []).find((r) => r.kind === kind && S.members.some((m) => m.id === r.member));
+  if (byKind) return {id: byKind.member, reason: `kind "${kind}"`};
+  let best = null, score = 0;
+  for (const r of S.jev.rules || []) { const n = (r.words || []).filter((w) => w && t.includes(w.toLowerCase())).length; if (n > score && S.members.some((m) => m.id === r.member)) { best = r; score = n; } }
+  return best ? {id: best.member, reason: `matched ${score} "${best.kind}" words`} : {id: hubId(), reason: "no rule matched: the Lead takes it"};
+}
+const jevKinds = () => [...new Set((S.jev.rules || []).map((r) => r.kind).concat("other"))];
+
+/* ---------- the graph ---------- */
+let graphMode = 'all';
+/* The view fits into the open sky between the floating panels (dock, title, console), not underneath them. */
+function skyInset() { return {l: 0, r: 0, t: 44, b: 44}; }   // room for the corner controls
+const brain = Brain.mount($("graph"), {hub: {id: "lead", label: "Lead", color: "#8b6cef"}, ring: [], inset: skyInset});
+window.__fireflyOverlaps = () => brain.overlaps();   // layout check used by the browser tests
+function openWorkspaceNote(id) {
+  if(graphMode==='team')document.querySelector('[data-lens="all"]').click();
+  brain.openNote(id);
+}
+function graph() {
+  const list = $('vault-list'); list.replaceChildren();
+  for(const n of S.notes){const b=document.createElement('button');b.type='button';const icon=document.createElement('i');icon.className='doc';const title=document.createElement('b');title.textContent=n.id;b.append(icon,title);b.onclick=()=>{if(graphMode==='team'){graphMode='all';document.querySelector('[data-lens="all"]').click();}openWorkspaceNote(n.id);list.querySelectorAll('button').forEach(x=>x.classList.toggle('selected',x===b));};list.append(b);}
+  $('vault-count').textContent = S.notes.length;
+  const cl = $('crew-list'); cl.replaceChildren();
+  const ranked = [{id: "owner", name: S.project.owner && S.project.owner !== "Owner" ? S.project.owner : "Dev", color: "#e8e8e8", note: "you"}, ...[S.members.find((m) => m.hub)].filter(Boolean).map((m) => ({...m, note: "lead"})), ...(S.rankedCrew || [])];
+  ranked.forEach((m, i) => { const b = document.createElement('button'); b.type = 'button';
+    b.innerHTML = `<span class="rk">${i + 1}</span><i style="background:${esc(m.color)}"></i><b>${esc(m.name)}</b><small>${esc(m.note || (MODELS[m.model]?.name || "").replace(/ \(.*\)$/, ""))}</small>`;
+    b.onclick = () => { brain.focus(m.id); if (m.id !== "owner") { talk.setTarget(m.id); if (matchMedia('(max-width:760px)').matches) document.querySelector('.mtabs button[data-m="chat"]').click(); } };
+    cl.append(b); });
+  $('crew-count').textContent = ranked.length;
+  const openTasks = S.tasks.filter((t) => t.status !== "done").length, plural = (n, w) => n + " " + w + (n === 1 ? "" : "s");
+  $('graph-title').textContent = S.project.name || "Firefly";
+  $('graph-count').textContent = plural(S.members.length, "crew member").replace("crew members", "crew") + " · " + plural(S.notes.length, "memory").replace("memorys", "memories") + (openTasks ? " · " + plural(openTasks, "task") + " in flight" : "");
+  $('workspace-count').textContent = S.server ? "Memory synced" : "Local view";
+  const hub = S.members.find((m) => m.hub) || S.members[0];
+  /* Pecking order, left to right: Dev, Lead, then the crew from strongest and most used to weakest. */
+  const STRENGTH = {"claude-opus-5-5": 6, "tier:hard": 5, "claude-sonnet-5-5": 4, "tier:easy": 2, "claude-haiku-5-5": 2, outside: 1};
+  const strength = (m) => STRENGTH[m.model] ?? (/^(anthropic|openai):/.test(m.model || "") ? 4 : /^(cloudflare|openrouter):/.test(m.model || "") ? 1 : 3);
+  const work = (id) => S.tasks.filter((t) => t.member === id).length + S.usage.filter((u) => u.member === id).length;
+  const crew = S.members.filter((m) => m !== hub).sort((a, b) => strength(b) - strength(a) || work(b.id) - work(a.id) || a.name.localeCompare(b.name));
+  S.rankedCrew = crew;
+  const tierName = (m) => ({"tier:hard": "Hard", "tier:easy": "Easy", outside: "Outside AI"}[m.model] || MODELS[m.model]?.name || "");
+  const sub = (m) => { const n = work(m.id); return [tierName(m), n ? n + " job" + (n > 1 ? "s" : "") : ""].filter(Boolean).join(" · "); };
+  const ring = crew.map((m) => ({id: m.id, label: m.name, color: m.color, info: m.job, sub: sub(m)}));
+  const showCrew = graphMode !== "memory", showMemory = graphMode !== "team";
+  const ownerId = "owner", isOrder = (n) => /^Order:/.test(n.id);
+  const noteIds = new Set(S.notes.map((n) => n.id));
+  // every crew chart holds its skills and its work; the Lead's holds the orders; Dev's holds the shared memories
+  const nodes = [], links = [];
+  if (showCrew) for (const m of [hub, ...crew].filter(Boolean)) {
+    for (const sid of m.skills || []) { const sk = S.skills.find((x) => x.id === sid); if (!sk) continue; const id = "skill:" + m.id + ":" + sid;
+      nodes.push({id, label: sk.name, color: m.color, info: "skill", group: m.id}); links.push([m.id, id]); }
+    for (const t of S.tasks.filter((x) => x.member === m.id).slice(0, 24)) { const id = "task:" + t._id;
+      nodes.push({id, label: (t.task || "task").slice(0, 30), color: m.color, info: (t.status === "done" ? "done" : t.status || "task") + (t.grade ? " · " + t.grade : ""), group: m.id}); links.push([m.id, id]);
+      const order = t.order && S.notes.find((n) => isOrder(n) && (n.text || "").includes("Order " + t.order));
+      if (order && showMemory) links.push([id, "note:" + order.id]); }
+  }
+  brain.update({
+    layout: "solar",
+    hub: showCrew && hub ? {id: hub.id, label: hub.name, color: hub.color, info: hub.job, sub: sub(hub)} : null,
+    top: showCrew ? {id: ownerId, label: S.project.owner && S.project.owner !== "Owner" ? S.project.owner : "Dev", color: "#e8e8e8", info: "You: approve money, keys and rule changes", sub: "you"} : null,
+    ring: showCrew ? ring : [],
+    onSelect(n){if(S.members.some(m=>m.id===n.id)){ $('app').classList.remove('zen');$('focus-mode').setAttribute('aria-pressed','false');if(matchMedia('(max-width:760px)').matches)document.querySelector('.mtabs button[data-m="chat"]').click();talk.setTarget(n.id);}},
+    notes: (showMemory ? S.notes : []).map((n) => ({id: n.id, text: n.text, at: n.at,
+      links: [...new Set([...(n.text || "").matchAll(/\[\[([^\]|#]+)/g)].map((x) => x[1].trim()))].filter((l) => noteIds.has(l)),
+      group: showCrew ? (isOrder(n) && hub ? hub.id : ownerId) : null, attach: showCrew ? (isOrder(n) && hub ? hub.id : n.id === "Home" ? ownerId : undefined) : undefined})),
+    extra: {nodes, links},
+  });
+}
+
+/* ---------- chat ---------- */
+function agents() {
+  const A = {};
+  for (const m of S.members) {
+    const skills = (m.skills || []).map((id) => S.skills.find((s) => s.id === id)).filter(Boolean);
+    const role = `${m.job || ""}${skills.length ? "\nYour skills:\n" + skills.map((s) => `- ${s.name}: ${s.text}`).join("\n") : ""}\nShared memory (team notes):\n${S.notes.map((n) => `## ${n.id}\n${(n.text || "").slice(0, 700)}`).join("\n").slice(0, 3500)}`;
+    A[m.id] = {label: m.name, color: m.color, role, relay: m.model === "outside",
+      ask: async (msgs, o) => {
+        const viaGateway = (model, messages = msgs) => { if (!gwOn()) throw {code: "add the Firefly passcode in Models"};
+          const chain = chainFor(model); if (!chain.length) throw {code: "no AIs listed for " + model};
+          return Brain.agents.gateway({url: GW.url, passcode: GW.pass, model: chain[0], fallback: chain.slice(1),
+            onAnswer: (d) => { GW.last = {member: m.id, asked: chain[0], ...d}; clearTimeout(GW.t); GW.t = setTimeout(gwStatus, 600); }})(messages, o); };
+        const s = await sampleP;
+        // Easy members may hand a job up: their reply "ESCALATE: why" re-runs it on the hard tier.
+        if (m.model === "tier:easy" && gwOn() && AI.tiers?.hard?.length) {
+          const first = await viaGateway("tier:easy", Brain.escalation.withInstruction(msgs));
+          const esc = Brain.escalation.parse(first);
+          if (!esc) return first;
+          S.escalations = (S.escalations || 0) + 1; toast(`${m.name} passed a job up to Hard: ${esc.reason}`);
+          const hard = await viaGateway("tier:hard", msgs);
+          return `(Passed up to Hard: ${esc.reason})\n\n${hard}`;
+        }
+        const tier = /^tier:(easy|hard)$/.exec(m.model || "");
+        if (tier && !gwOn() && s) return Brain.agents.claude(s, {model: tier[1] === "easy" ? "claude-haiku-5-5" : "claude-sonnet-5-5"})(msgs, o);
+        if (isGateway(m.model)) return viaGateway(m.model);
+        if (s) return Brain.agents.claude(s, {model: m.model})(msgs, o);
+        if (gwOn()) return viaGateway("anthropic:" + m.model);
+        throw {code: "AI is off in this view"}; }};
+  }
+  return A;
+}
+/* Quick lane: greetings, maths, the time and simple facts are answered for free before the Lead spends anything.
+   Asking the same thing again straight away means the quick answer wasn't good enough: it goes to the team instead. */
+const isFreeModel = (id) => /^cloudflare:/.test(id || "") || /^openrouter:.+:free$/.test(id || "");
+async function quickAnswer(text) {
+  const n = QuickRules.normalize(text), lead = S.members.find((m) => m.hub);
+  const ctx = {members: S.members.filter((m) => !m.hub).map((m) => ({name: m.name})), lead: lead?.name, local: true};
+  if (S.lastQuick?.n === n) {
+    if (S.lastQuick.source !== "instant" && gwOn()) fetch(GW.url.replace(/\/$/, "") + "/api/quick/grade", {method: "POST", headers: {"Content-Type": "application/json", Authorization: "Bearer " + GW.pass}, body: JSON.stringify({question: text, good: false})}).catch(() => {});
+    S.lastQuick = null; return null; }
+  const rule = QuickRules.instant(text, ctx);
+  if (rule) { S.lastQuick = {n, source: "instant"}; S.quickLocal = (S.quickLocal || 0) + 1; renderModels(); return {text: rule, tag: "no AI used"}; }
+  if (!gwOn() || !QuickRules.looksSimple(text)) return null;
+  const freeChain = (AI.tiers?.easy || []).filter(isFreeModel);
+  const r = await fetch(GW.url.replace(/\/$/, "") + "/api/quick", {method: "POST", headers: {"Content-Type": "application/json", Authorization: "Bearer " + GW.pass},
+    body: JSON.stringify({question: text, members: ctx.members, lead: ctx.lead, freeChain})});
+  if (!r.ok) return null; const d = await r.json(); if (!d.answered) return null;
+  S.lastQuick = {n, source: d.source}; clearTimeout(GW.t); GW.t = setTimeout(gwStatus, 600);
+  return {text: d.text, tag: d.source === "remembered" ? "free · remembered" : "free · " + (MODELS[d.model]?.name || "free model")};
+}
+/* Kitchen orders: "we're making …" / "let's build …" / "order: …" go to the server's kitchen, which plans tickets, cooks
+   them in parallel and assembles the result. "approve 3" releases a ticket held for the owner. */
+const ORDER = /^(order:|\/order\s|we(?:'|’)?re (?:making|building)|we are (?:making|building)|let(?:'|’)?s (?:make|build|create)|make (?:me|us) (?:a|an|the|some)\b|build (?:me|us) (?:a|an|the|some)\b)/i;
+const api = (path, body) => fetch(GW.url.replace(/\/$/, "") + path, {method: body ? "POST" : "GET", headers: {"Content-Type": "application/json", Authorization: "Bearer " + GW.pass}, body: body ? JSON.stringify(body) : undefined});
+function orderText(o) {
+  const n = (s) => o.tickets.filter((t) => t.status === s).length, total = o.tickets.length, name = (id) => S.members.find((m) => m.id === id)?.name || id;
+  const mark = {done: "✓", cooking: "…", queued: "·", held: "?", failed: "✗", cancelled: "–"};
+  const list = o.tickets.map((t) => `${mark[t.status] || "·"} ${t.id}. ${t.task} — ${name(t.member)}${t.size === "hard" ? " (hard)" : ""}${t.passedUp ? " (passed up)" : ""}`).join("\n");
+  const held = o.tickets.filter((t) => t.status === "held");
+  const ask = held.length ? `\n\nWaiting for your yes: ${held.map((t) => `ticket ${t.id} (${t.why})`).join(", ")}. Reply "approve ${held[0].id}" to run it.` : "";
+  if (o.status === "planning") return `Order in: ${o.title}\nThe Lead is writing the tickets…`;
+  if (o.status === "cooking") return `Cooking ${o.title}: ${n("done")} of ${total} tickets done${n("cooking") ? `, ${n("cooking")} on the stove` : ""}.\n\n${list}${ask}`;
+  if (o.status === "assembling") return `All tickets cooked. The Lead is putting ${o.title} together…\n\n${list}`;
+  if (o.status === "done") return `Ready: ${o.title}\n${n("done")} of ${total} tickets done. The full result is in Memory, note "Order: ${o.title}".\n\n${list}${ask}`;
+  if (o.status === "cancelled") return `Cancelled: ${o.title}.`;
+  return `Couldn't finish ${o.title}: ${o.error || "no AI answered"}.\n\n${list}`;
+}
+function watchOrder(id, update) {
+  let tries = 0;
+  const tick = async () => {
+    if (++tries > 400) return;   // about 20 minutes
+    try { const r = await api("/api/orders/" + encodeURIComponent(S.projectId)); const o = r.ok ? (await r.json()).orders.find((x) => x.id === id) : null;
+      if (o) { update(orderText(o), `order ${o.status}`, "m-order-" + o.id); if (["done", "failed", "cancelled"].includes(o.status)) { if (o.status === "done" && db?.refresh) db.refresh().catch(() => {}); return; } } }
+    catch (e) { /* try again shortly */ }
+    setTimeout(tick, 3000);
+  };
+  setTimeout(tick, 1500);
+}
+async function placeOrder(text, update) {
+  if (!gwOn() || !S.server) return false;
+  const approve = /^approve\s+(?:ticket\s+)?(\d+)$/i.exec(text.trim());
+  if (approve) {
+    const r = await api("/api/orders/" + encodeURIComponent(S.projectId)); if (!r.ok) return false;
+    const o = (await r.json()).orders.find((x) => x.tickets.some((t) => t.id === +approve[1] && t.status === "held")); if (!o) return false;
+    const a = await api(`/api/orders/${encodeURIComponent(S.projectId)}/${o.id}/approve`, {ticket: +approve[1]}); if (!a.ok) return false;
+    update(`Approved ticket ${approve[1]} of ${o.title}. Back on the stove…`, "order cooking", "m-order-" + o.id); watchOrder(o.id, update); return true;
+  }
+  if (!ORDER.test(text.trim())) return false;
+  const skillText = (m) => (m.skills || []).map((id) => S.skills.find((x) => x.id === id)).filter(Boolean).map((x) => `${x.name}: ${x.text}`);
+  const r = await api("/api/orders/" + encodeURIComponent(S.projectId), {request: text.replace(/^(order:|\/order)\s*/i, ""),
+    members: S.members.map((m) => ({id: m.id, name: m.name, job: m.job, hub: !!m.hub, skillsText: skillText(m)})), jev: S.jev, tiers: AI.tiers || {}});
+  if (!r.ok) return false;
+  const {order} = await r.json(); update(orderText(order), "order in", "m-order-" + order.id); watchOrder(order.id, update); return true;
+}
+const store = {
+  async load() { return []; },
+  async save(m) { if (db && S.canEdit) return m.id ? db.collection("chat").doc(m.id).set({...m, authorId: S.me.id || null}) : db.collection("chat").add({...m, authorId: S.me.id || null});
+    if (S.standalone && !S.server) try { const l = JSON.parse(localStorage.getItem("firefly-chat") || "[]").filter((x) => !m.id || x.id !== m.id); l.push(m); localStorage.setItem("firefly-chat", JSON.stringify(l.slice(-150))); } catch (e) { /* storage blocked */ } },
+};
+const talk = Brain.chat($("chat"), brain, {from: {id: "owner", label: "You", color: "#f0f0f0"}, hub: "lead", agents: {}, store,
+  rules: "Only the owner approves money, keys or rule changes. Never claim you did something you didn't.",
+  dispatch: {get kinds() { return jevKinds(); }, route: jevRoute},
+  quick: quickAnswer,
+  order: placeOrder,
+  onRun: ({id, ok}) => { const m = S.members.find((x) => x.id === id); if (db && S.canEdit && m) db.collection("usage").add({member: id, model: m.model, ok, at: new Date().toISOString()}).catch(() => {}); },
+  onTask: (t) => { if (db && S.canEdit) db.collection("tasks").add({...t, status: t.relay ? "waiting" : "done", grade: null, at: new Date().toISOString()}).catch(() => {}); },
+});
+
+/* ---------- settings panels ---------- */
+const editable = () => S.canEdit && !!db;
+const memberOpts = (sel) => S.members.map((m) => `<option value="${esc(m.id)}"${m.id === sel ? " selected" : ""}>${esc(m.name)}</option>`).join("");
+function renderTeam() {
+  const v = $("v-team"); if (!v) return;
+  const rows = S.members.map((m) => `<div class="row"><i class="sw" style="background:${esc(m.color)}"></i><div class="grow">
+      <b style="font-weight:500">${esc(m.name)}</b>${m.hub ? ' <span class="chip">Lead</span>' : ""} <span class="sub">${esc(MODELS[m.model]?.name || m.model)}</span>
+      <div class="sub" style="color:#bbb">${esc(m.job)}</div>
+      <div class="chips" style="margin-top:4px">${(m.skills || []).map((id) => `<span class="chip">${esc(S.skills.find((s) => s.id === id)?.name || id)}</span>`).join("")}</div></div>
+      ${editable() ? `<button class="btn ghost" type="button" data-edit="${esc(m._id)}">Edit</button>` : ""}</div>`).join("");
+  const ed = S.editMember ? S.members.find((m) => m._id === S.editMember) : null;
+  const form = editable() ? `<form class="f" id="mform"><h3 style="margin:4px 0 0">${ed ? "Edit " + esc(ed.name) : "Add a member"}</h3>
+      <label>Name<input id="m-name" maxlength="30" required value="${esc(ed?.name || "")}"></label>
+      <label>Job<textarea id="m-job" maxlength="400" required>${esc(ed?.job || "")}</textarea></label>
+      <label>Thinks with<select id="m-model">${Object.entries(MODELS).map(([k, x]) => `<option value="${k}"${(ed?.model || "claude-haiku-5-5") === k ? " selected" : ""}>${x.name} · ${x.note}</option>`).join("")}</select></label>
+      <div><div class="sub" style="margin-bottom:4px">Skills</div><div class="chips">${S.skills.map((s) => `<label class="chk"><input type="checkbox" value="${esc(s.id)}"${(ed?.skills || []).includes(s.id) ? " checked" : ""}>${esc(s.name)}</label>`).join("") || '<span class="sub">Add skills in the Skills tab.</span>'}</div></div>
+      <label class="chk"><input type="checkbox" id="m-hub"${ed?.hub ? " checked" : ""}> This member is the Lead</label>
+      <div style="display:flex;gap:8px"><button class="btn" type="submit">${ed ? "Save" : "Add"}</button>${ed ? `<button class="btn ghost" type="button" id="m-cancel">Cancel</button><button class="btn ghost" type="button" id="m-del">Remove</button>` : ""}</div>
+      <div class="err" id="m-err"></div></form>` : '<p class="sub">Only people who can edit this page change the team.</p>';
+  v.innerHTML = `<div class="sec"><h3>Team</h3>${rows || '<p class="empty">No members yet.</p>'}</div>${form}${starterCard()}`;
+  v.querySelectorAll("[data-edit]").forEach((b) => b.onclick = () => { S.editMember = b.dataset.edit; renderTeam(); });
+  const f = $("mform"); if (!f) return;
+  if ($("m-cancel")) $("m-cancel").onclick = () => { S.editMember = null; renderTeam(); };
+  if ($("m-del")) $("m-del").onclick = async () => { if (ed.hub) { $("m-err").textContent = "Pick another Lead first."; return; } await db.collection("members").doc(ed._id).delete(); S.editMember = null; };
+  f.onsubmit = async (e) => { e.preventDefault();
+    const doc = {name: $("m-name").value.trim(), job: $("m-job").value.trim(), model: $("m-model").value, hub: $("m-hub").checked,
+      skills: [...f.querySelectorAll('.chips input[type="checkbox"]:checked')].map((x) => x.value)};
+    if (!doc.name || !doc.job) return;
+    try {
+      if (doc.hub) for (const m of S.members.filter((x) => x.hub && x._id !== ed?._id)) await db.collection("members").doc(m._id).update({hub: false});
+      if (ed) await db.collection("members").doc(ed._id).update(doc);
+      else { const id = slug(doc.name); await db.collection("members").doc(id).set({...doc, id, color: COLORS[S.members.length % COLORS.length], at: new Date().toISOString()}); }
+      S.editMember = null;
+    } catch (x) { $("m-err").textContent = "Couldn't save (" + (x?.code || "error") + ")."; } };
+}
+function starterCard() {
+  if (!editable() || S.members.length) return "";
+  return `<div class="sec"><h3>Start with a starter brain</h3><p class="sub">A Lead and six members, four skills, JEV rules and a few notes. Change anything after.</p>
+    <button class="btn" type="button" id="starter">Set up starter brain</button></div>`;
+}
+async function setupStarter() {
+  const btn = $("starter"); if (btn) { btn.disabled = true; btn.textContent = "Setting up…"; }
+  const now = new Date().toISOString();
+  for (const m of STARTER.members) await db.collection("members").doc(m.id).set({...m, at: now});
+  for (const s of STARTER.skills) await db.collection("skills").doc(s.id).set({...s, at: now});
+  for (const n of STARTER.notes) await db.collection("notes").doc(slug(n.id)).set({...n, at: now});
+  await db.collection("config").doc("jev").set({...STARTER.jev, at: now});
+}
+function renderSkills() {
+  const v = $("v-skills");
+  const rows = S.skills.map((s) => `<div class="row"><div class="grow"><b style="font-weight:500">${esc(s.name)}</b>
+      <div class="sub" style="color:#bbb">${esc(s.text)}</div><div class="sub">used by ${S.members.filter((m) => (m.skills || []).includes(s.id)).map((m) => esc(m.name)).join(", ") || "nobody yet"}</div></div>
+      ${editable() ? `<button class="btn ghost" type="button" data-sdel="${esc(s._id)}">Remove</button>` : ""}</div>`).join("");
+  v.innerHTML = `<div class="sec"><h3>Skills</h3><p class="sub">Instruction packs a member follows. Attach them in Team.</p>${rows || '<p class="empty">No skills yet.</p>'}</div>
+    ${editable() ? `<form class="f" id="sform"><h3 style="margin:4px 0 0">Add a skill</h3><label>Name<input id="s-name" maxlength="40" required></label>
+      <label>Instructions<textarea id="s-text" maxlength="1200" required placeholder="What the member should always do with this skill"></textarea></label><button class="btn" type="submit">Add</button></form>` : ""}`;
+  v.querySelectorAll("[data-sdel]").forEach((b) => b.onclick = () => db.collection("skills").doc(b.dataset.sdel).delete());
+  const f = $("sform"); if (f) f.onsubmit = async (e) => { e.preventDefault(); const name = $("s-name").value.trim(), text = $("s-text").value.trim(); if (!name || !text) return;
+    await db.collection("skills").doc(slug(name)).set({id: slug(name), name, text, at: new Date().toISOString()}); };
+}
+function renderJev() {
+  const v = $("v-jev"); const J = S.jev;
+  const rows = (J.rules || []).map((r, i) => `<div class="row"><div class="grow" style="display:grid;gap:6px">
+      <div style="display:flex;gap:6px"><input data-k="${i}" value="${esc(r.kind)}" aria-label="Kind" style="max-width:120px"${editable() ? "" : " disabled"}>
+        <select data-mem="${i}" aria-label="Goes to"${editable() ? "" : " disabled"}>${memberOpts(r.member)}</select></div>
+      <input data-w="${i}" value="${esc((r.words || []).join(", "))}" aria-label="Words"${editable() ? "" : " disabled"}></div>
+      ${editable() ? `<button class="btn ghost" type="button" data-rdel="${i}">×</button>` : ""}</div>`).join("");
+  v.innerHTML = `<div class="sec"><h3>JEV, the dispatcher</h3><p class="sub">You tell the Lead; the Lead writes tasks with a kind; JEV sends each kind to a member. Rules, not AI: it costs nothing.</p>
+      <form class="f" id="jtry"><label>Try a task<input id="j-task" placeholder="e.g. research three competitors"></label><button class="btn ghost" type="submit">Route it</button><div class="sub" id="j-out"></div></form></div>
+    <div class="sec"><h3>Rules</h3><div class="sub" style="margin-bottom:6px">kind → member · words that also match it</div>${rows}
+      ${editable() ? `<div style="display:flex;gap:8px;margin-top:8px"><button class="btn ghost" type="button" id="j-add">Add rule</button><button class="btn" type="button" id="j-save">Save rules</button></div>` : ""}</div>
+    <div class="sec"><h3>Stays with the Lead</h3><p class="sub">Tasks mentioning these never go to other members, and need the owner's yes.</p>
+      <textarea id="j-sens"${editable() ? "" : " disabled"}>${esc((J.sensitive || []).join(", "))}</textarea><div class="err" id="j-err"></div></div>`;
+  $("jtry").onsubmit = (e) => { e.preventDefault(); const t = $("j-task").value.trim(); if (!t) return;
+    const r = jevRoute("", t); $("j-out").textContent = `→ ${S.members.find((m) => m.id === r.id)?.name || r.id} (${r.reason})`; };
+  const read = () => ({sensitive: $("j-sens").value.split(",").map((x) => x.trim()).filter(Boolean),
+    rules: (J.rules || []).map((r, i) => ({kind: v.querySelector(`[data-k="${i}"]`).value.trim().toLowerCase() || "other", member: v.querySelector(`[data-mem="${i}"]`).value,
+      words: v.querySelector(`[data-w="${i}"]`).value.split(",").map((x) => x.trim()).filter(Boolean)}))});
+  if ($("j-add")) $("j-add").onclick = () => { S.jev = {...read(), rules: [...read().rules, {kind: "new", member: hubId(), words: []}]}; renderJev(); };
+  v.querySelectorAll("[data-rdel]").forEach((b) => b.onclick = () => { const r = read(); r.rules.splice(+b.dataset.rdel, 1); S.jev = r; renderJev(); });
+  if ($("j-save")) $("j-save").onclick = async () => { try { await db.collection("config").doc("jev").set({...read(), at: new Date().toISOString()}); $("j-err").textContent = ""; $("j-save").textContent = "Saved"; setTimeout(() => $("j-save") && ($("j-save").textContent = "Save rules"), 1500); } catch (x) { $("j-err").textContent = "Couldn't save."; } };
+}
+/* The Critic suggests improvements to Firefly itself; they're appended to the "Improving Firefly" note. */
+async function askIdeas(btn) {
+  const critic = S.members.find((m) => m.id === "critic") || S.members.find((m) => m.hub); const A = agents()[critic?.id];
+  if (!A) return toast("No team member to ask.");
+  btn.disabled = true; btn.textContent = "Thinking…";
+  try {
+    const prompt = `You are ${critic.name}. ${critic.job}\nFirefly is a space where many AIs work together: free models do easy work, paid models hard work, JEV routes tasks by rules, notes are an Obsidian vault, the owner approves every change.\nCurrent notes:\n${S.notes.map((n) => "## " + n.id + "\n" + (n.text || "").slice(0, 500)).join("\n").slice(0, 3000)}\n\nSuggest exactly three concrete improvements to Firefly itself. One line each, starting with "- ", plain English, each with why it matters.`;
+    const text = await A.ask([{role: "user", content: prompt}], {});
+    const ideas = String(text || "").split("\n").map((l) => l.trim()).filter((l) => /^[-*•]\s+/.test(l)).slice(0, 3).map((l) => "- " + l.replace(/^[-*•]\s+/, ""));
+    if (!ideas.length) throw {code: "no ideas in the reply"};
+    const note = S.notes.find((n) => n.id === "Improving Firefly");
+    const stamp = `- **${new Date().toISOString().slice(0, 10)}, ${critic.name}:**`;
+    const block = [stamp, ...ideas.map((l) => "  " + l)].join("\n");
+    const base = note?.text || "# Improving Firefly\n\n## Ideas\n";
+    const next = /## Ideas\n/.test(base) ? base.replace(/## Ideas\n(\s*- \(none yet\)\n)?/, (m) => "## Ideas\n\n" + block + "\n") : base.trimEnd() + "\n\n## Ideas\n\n" + block + "\n";
+    await db.collection("notes").doc(note ? note._id : slug("Improving Firefly")).set({id: "Improving Firefly", text: next, at: new Date().toISOString()});
+    toast("Three ideas saved in Improving Firefly."); openWorkspaceNote("Improving Firefly");
+  } catch (e) { toast("Couldn't get ideas: " + (e?.code || e?.message || "unknown problem")); }
+  finally { btn.disabled = false; btn.textContent = "Ask the team for ideas"; }
+}
+/* Redraws must never eat typing: keep any changed field (by id) and the cursor when a view is redrawn. */
+function keepTyping(view, draw) {
+  const el = typeof view === "string" ? $(view) : view; if (!el) return draw();
+  const fresh = Date.now() - (S.submittedAt || 0) < 4000;
+  const kept = fresh ? [] : [...el.querySelectorAll("input[id],textarea[id],select[id]")].filter((x) => x.type !== "file" && x.value !== x.defaultValue && !(x.tagName === "SELECT"))
+    .map((x) => ({id: x.id, value: x.value}));
+  const f = document.activeElement && el.contains(document.activeElement) ? {id: document.activeElement.id, s: document.activeElement.selectionStart, e: document.activeElement.selectionEnd} : null;
+  draw();
+  for (const k of kept) { const x = $(k.id); if (x && el.contains(x) && !x.disabled) x.value = k.value; }
+  if (f?.id) { const x = $(f.id); if (x) { x.focus(); try { if (f.s != null) x.setSelectionRange(f.s, f.e); } catch (e) { /* not a text field */ } } }
+}
+function renderMemory() {
+  const v = $("v-memory"); const ed = S.editNote ? S.notes.find((n) => n._id === S.editNote) : null;
+  const rows = S.notes.map((n) => `<div class="row"><div class="grow"><b style="font-weight:500;cursor:pointer" data-open="${esc(n.id)}">${esc(n.id)}</b>
+      <div class="sub">${esc((n.text || "").replace(/[#*\[\]]/g, "").slice(0, 90))}</div></div>${editable() ? `<button class="btn ghost" type="button" data-nedit="${esc(n._id)}">Edit</button>` : ""}</div>`).join("");
+  v.innerHTML = `<div class="sec"><h3>Memory</h3><p class="sub">Linked notes every member reads. Link with [[Note name]]. Click a name to open it in the graph.</p>${rows || '<p class="empty">No notes yet.</p>'}</div>
+    <div class="sec"><h3>Obsidian</h3><p class="sub">Download these notes as a folder Obsidian opens as a vault. Edit them there, then load the changed .md files back in.</p>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:8px"><button class="btn" type="button" id="vault-down">Download for Obsidian</button>
+      ${editable() ? '<label class="btn ghost" style="cursor:pointer">Load .md files<input type="file" id="vault-up" accept=".md,text/markdown" multiple hidden></label>' : ""}</div></div>
+    ${editable() ? `<div class="sec"><h3>Improve Firefly</h3><p class="sub">The Critic suggests three improvements to Firefly itself. They're saved under Ideas in [[Improving Firefly]]; nothing changes until you approve a pull request.</p>
+      <button class="btn ghost" type="button" id="ideas" style="margin-top:8px">Ask the team for ideas</button></div>` : ""}
+    ${editable() ? `<form class="f" id="nform"><h3 style="margin:4px 0 0">${ed ? "Edit " + esc(ed.id) : "New note"}</h3><label>Title<input id="n-title" maxlength="60" required value="${esc(ed?.id || "")}"${ed ? " disabled" : ""}></label>
+      <label>Text<textarea id="n-text" style="min-height:140px" required>${esc(ed?.text || "")}</textarea></label>
+      <div style="display:flex;gap:8px"><button class="btn" type="submit">Save</button>${ed ? '<button class="btn ghost" type="button" id="n-cancel">Cancel</button><button class="btn ghost" type="button" id="n-del">Delete</button>' : ""}</div></form>` : ""}`;
+  $("vault-down").onclick = () => {
+    const files = S.notes.map((n) => ({name: Brain.noteFile(n.id), text: n.text || ""}));
+    const url = URL.createObjectURL(new Blob([Brain.zip(files)], {type: "application/zip"}));
+    const a = document.createElement("a"); a.href = url; a.download = slug(S.project.name || "firefly") + "-vault.zip"; document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 5000); toast(`Downloaded ${files.length} notes. Unzip, then in Obsidian choose "Open folder as vault".`); };
+  if ($("vault-up")) $("vault-up").onchange = async (e) => {
+    const list = [...e.target.files].filter((f) => /\.md$/i.test(f.name) && f.size < 60000); let n = 0;
+    for (const f of list) { const title = f.name.replace(/\.md$/i, "").trim(); if (!title) continue;
+      const old = S.notes.find((x) => x.id === title);
+      await db.collection("notes").doc(old ? old._id : slug(title)).set({id: title, text: await f.text(), at: new Date().toISOString()}); n++; }
+    toast(n ? `Loaded ${n} note${n > 1 ? "s" : ""} from Obsidian.` : "No .md notes found (each must be under 60 KB)."); };
+  if ($("ideas")) $("ideas").onclick = () => askIdeas($("ideas"));
+  v.querySelectorAll("[data-open]").forEach((b) => b.onclick = () => openWorkspaceNote(b.dataset.open));
+  v.querySelectorAll("[data-nedit]").forEach((b) => b.onclick = () => { S.editNote = b.dataset.nedit; renderMemory(); });
+  if ($("n-cancel")) $("n-cancel").onclick = () => { S.editNote = null; renderMemory(); };
+  if ($("n-del")) $("n-del").onclick = async () => { await db.collection("notes").doc(ed._id).delete(); S.editNote = null; };
+  const f = $("nform"); if (f) f.onsubmit = async (e) => { e.preventDefault(); const title = ed ? ed.id : $("n-title").value.trim(), text = $("n-text").value; if (!title || !text.trim()) return;
+    await db.collection("notes").doc(ed ? ed._id : slug(title)).set({id: title, text, at: new Date().toISOString()}); S.editNote = null; };
+}
+function renderModels() {
+  const v = $("v-models"); const month = new Date().toISOString().slice(0, 7);
+  const calls = {}; for (const u of S.usage) if ((u.at || "").startsWith(month)) calls[u.model] = (calls[u.model] || 0) + 1;
+  const max = Math.max(1, ...Object.values(calls));
+  const bars = Object.entries(MODELS).map(([k, x]) => `<div style="margin-top:9px"><div style="display:flex;gap:8px;align-items:baseline"><b style="font-weight:500;font-size:13px">${x.name}</b>
+      <span class="sub">${S.members.filter((m) => m.model === k).map((m) => esc(m.name)).join(", ") || "no members"}</span><span style="margin-left:auto;font-variant-numeric:tabular-nums">${calls[k] || 0}</span></div>
+      <div class="bar"><i style="width:${(calls[k] || 0) / max * 100}%;background:${x.color}"></i></div></div>`).join("");
+  const perf = S.members.map((m) => { const T = S.tasks.filter((t) => t.member === m.id); const done = T.filter((t) => t.status === "done");
+    const used = done.filter((t) => t.grade === "used").length, fixed = done.filter((t) => t.grade === "fixed").length, rej = done.filter((t) => t.grade === "rejected").length;
+    const ungraded = done.length - used - fixed - rej, pend = T.length - done.length, tot = Math.max(1, T.length);
+    const seg = (n, c) => n ? `<i style="width:${n / tot * 100}%;background:${c}"></i>` : "";
+    return `<div style="margin-top:10px"><div style="display:flex;gap:8px;align-items:baseline"><b style="font-weight:500;font-size:13px;color:${esc(m.color)}">${esc(m.name)}</b>
+      <span style="margin-left:auto;font-size:12px">${used + fixed + rej ? Math.round((used + fixed) / (used + fixed + rej) * 100) + "% used" : done.length ? "to grade" : T.length ? "working" : "no work yet"}</span></div>
+      <div class="bar">${seg(used, "var(--up)")}${seg(fixed, "var(--warn)")}${seg(rej, "var(--down)")}${seg(ungraded, "#55526a")}${seg(pend, "#3a3a3a")}</div>
+      <div class="sub">${T.length} tasks · ${used} used · ${fixed} needed fixes · ${rej} not used · ${ungraded} to grade · ${pend} waiting</div></div>`; }).join("");
+  const st = GW.status, P = st?.providers || {};
+  const gwRows = st && !st.error ? Object.keys(P).map((p) => { const u = st.usage?.[p] || {}, cap = st.limits?.[p];
+    return `<tr><td>${esc(p)}</td><td>${P[p] ? '<span class="up">ready</span>' : '<span class="sub">no key</span>'}</td><td>${u.calls || 0}${cap ? " / " + esc(cap) : ""}</td><td>${u.failed || 0}</td></tr>`; }).join("") : "";
+  const gw = `<div class="sec"><h3>Firefly server</h3><div class="sub">Holds the AI keys, switches to a backup AI when one runs out, and counts each AI's use today.</div>
+    <form id="gw-form" class="form" style="margin-top:8px"><label>Passcode<input id="gw-pass" type="password" autocomplete="current-password" value="${esc(GW.pass)}"></label>
+      <label>Server address <span class="sub">(leave empty when this page is opened from the Firefly server)</span><input id="gw-url" placeholder="https://firefly.example.workers.dev" value="${esc(GW.url)}"></label>
+      <button class="btn" type="submit">Connect</button></form>
+    ${st?.error ? `<p class="err">${esc(st.error)}</p>` : ""}${GW.memoryError ? `<p class="err">${esc(GW.memoryError)}</p>` : ""}
+    ${S.server ? `<div class="sub" style="margin-top:6px"><span class="up">Memory on:</span> team, notes, tasks and chat for <b>${esc(S.project.name || S.projectId)}</b> are saved on the server.</div>` : ""}
+    ${gwRows ? `<table style="margin-top:8px"><thead><tr><th>AI</th><th>Key</th><th>Calls today</th><th>Failed</th></tr></thead><tbody>${gwRows}</tbody></table>
+      <div class="sub">Usage kept ${st.usageStore === "kv" ? "in Cloudflare storage" : "in memory (resets when the server restarts)"} · ${esc(st.day)}</div>` : ""}
+    ${GW.last ? `<div class="sub" style="margin-top:6px">Last answer: ${esc(GW.last.model)}${GW.last.model !== GW.last.asked ? ` (backup for ${esc(GW.last.asked)})` : ""}${GW.last.tried?.length ? " · skipped " + GW.last.tried.map((t) => esc(t.model + ": " + t.error)).join(", ") : ""}</div>` : ""}
+    ${st && !st.error ? (() => { const FREE = new Set(["cloudflare", "openrouter", "gemini"]); let free = 0, paid = 0;
+      for (const [p, u] of Object.entries(st.usage || {})) { if (FREE.has(p)) free += u.calls || 0; else paid += u.calls || 0; }
+      const Q = st.quick || {}, noAI = (S.quickLocal || 0) + (Q.instant || 0), quickN = noAI + (Q.remembered || 0) + (Q["free-model"] || 0);
+      return free + paid + quickN ? `<div class="savings"><b>${free + quickN}</b> of <b>${free + paid + quickN}</b> answers today cost nothing${quickN ? ` · ${quickN} quick answer${quickN > 1 ? "s" : ""} (${noAI} with no AI, ${Q.remembered || 0} remembered)` : ""}${S.escalations ? ` · ${S.escalations} job${S.escalations > 1 ? "s" : ""} passed up to Hard this visit` : ""}</div>` : ""; })() : ""}
+    ${AI.fallback?.length ? `<div class="sub" style="margin-top:6px">Backup order: ${AI.fallback.map((x) => esc(MODELS[x]?.name || x)).join(" → ")}</div>` : ""}</div>`;
+  v.innerHTML = gw + `<div class="sec"><h3>Models</h3><div class="sub">calls this month, from this page</div>${bars}</div>
+    <div class="sec"><h3>Performance review</h3><div class="sub">From your grades in Tasks: green used, amber needed fixes, red not used, purple to grade, grey waiting.</div>${perf || '<p class="empty">No members yet.</p>'}</div>`;
+  const f = $("gw-form"); if (f) f.onsubmit = (e) => { e.preventDefault(); GW.pass = $("gw-pass").value.trim(); GW.url = $("gw-url").value.trim();
+    try { localStorage.setItem("firefly-pass", GW.pass); localStorage.setItem("firefly-url", GW.url); } catch (x) { /* kept for this visit only */ }
+    if (S.standalone) { location.reload(); return; }
+    renderAll(); aiPill(); gwStatus(); };
+}
+function renderTasks() {
+  const v = $("v-tasks");
+  const rows = S.tasks.slice().sort((a, b) => (b.at || "").localeCompare(a.at || "")).slice(0, 60).map((t) => { const m = S.members.find((x) => x.id === t.member) || {name: t.member, color: "#888"};
+    const g = (k, label, c) => `<button type="button" data-g="${k}" data-t="${esc(t._id)}" aria-pressed="${t.grade === k}" style="${t.grade === k ? "background:" + c : ""}">${label}</button>`;
+    return `<div class="row"><i class="sw" style="background:${esc(m.color)}"></i><div class="grow"><b style="font-weight:500">${esc(m.name)}</b> <span class="chip">${esc(t.kind || "task")}</span> <span class="sub">${ago(t.at)} · ${esc(t.status)}</span>
+      <div style="font-size:13px;margin-top:2px">${esc(t.task)}</div>${t.why ? `<div class="sub">JEV: ${esc(t.why)}</div>` : ""}
+      ${t.text ? `<details><summary>Report</summary><pre class="res">${esc(t.text)}</pre></details>` : ""}
+      ${editable() && t.status === "done" ? `<div class="grade">${g("used", "Used", "var(--up)")}${g("fixed", "Needed fixes", "var(--warn)")}${g("rejected", "Not used", "var(--down)")}</div>` : ""}
+      ${editable() && t.status !== "done" ? `<div class="grade"><button type="button" data-done="${esc(t._id)}">Mark done</button></div>` : ""}</div></div>`; }).join("");
+  v.innerHTML = `<div class="sec"><h3>Tasks</h3><p class="sub">Every task JEV handed out. Grade each report: it feeds the performance review.</p></div>${rows || '<p class="empty">No tasks yet. Ask the Lead for something.</p>'}`;
+  v.querySelectorAll("[data-g]").forEach((b) => b.onclick = () => db.collection("tasks").doc(b.dataset.t).update({grade: b.dataset.g}));
+  v.querySelectorAll("[data-done]").forEach((b) => b.onclick = () => db.collection("tasks").doc(b.dataset.done).update({status: "done"}));
+}
+function renderAll() {
+  keepTyping("v-team", renderTeam); keepTyping("v-skills", renderSkills); keepTyping("v-jev", renderJev);
+  keepTyping("v-memory", renderMemory); keepTyping("v-models", renderModels); keepTyping("v-tasks", renderTasks); graph();
+  const hub = hubId(); talk.setAgents(agents(), hub);
+  if (document.activeElement !== $("pname")) $("pname").value = S.project.name || "Firefly"; $("pname").disabled = !editable(); }
+// A form that was just submitted should come back empty, not with the old typing restored.
+document.addEventListener("submit", () => { S.submittedAt = Date.now(); }, true);
+
+document.querySelectorAll(".tabs button").forEach((b) => b.onclick = () => {
+  document.querySelectorAll(".tabs button").forEach((x) => x.setAttribute("aria-selected", String(x === b)));
+  ["team", "skills", "jev", "memory", "models", "tasks"].forEach((t) => $("v-" + t).hidden = t !== b.dataset.t); });
+document.querySelectorAll(".mtabs button").forEach((b) => b.onclick = () => { $("app").dataset.m = b.dataset.m;
+  document.querySelectorAll(".mtabs button").forEach((x) => x.setAttribute("aria-pressed", String(x === b))); setTimeout(() => brain.fit(), 80); });
+$("side-btn").onclick = () => $("app").classList.toggle("side-open");
+$("v-team").addEventListener("click", (e) => { if (e.target.id === "starter") setupStarter(); });
+$("pname").addEventListener("change", () => { if (editable()) db.collection("config").doc("project").set({...S.project, name: $("pname").value.trim() || "My project"}).catch(() => {}); });
+
+
+/* Search provides a keyboard-accessible path to every graph member and note. */
+function openPanel(id) {
+  document.querySelector('.tabs button[data-t="' + id + '"]').click();
+  $('app').classList.add('side-open');
+  if (matchMedia('(max-width:760px)').matches) document.querySelector('.mtabs button[data-m="side"]').click();
+}
+const commandDialog = $('command-dialog');
+function searchCommands() {
+  const q = $('command-search').value.trim().toLowerCase();
+  const items = [
+    ...S.members.map(m => ({name:m.name, kind:'Team', run:()=>{if(graphMode==='memory')document.querySelector('[data-lens="all"]').click();$('app').classList.remove('zen');$('focus-mode').setAttribute('aria-pressed','false');brain.focus(m.id);brain.burst(m.id);if(matchMedia('(max-width:760px)').matches)document.querySelector('.mtabs button[data-m="chat"]').click();talk.setTarget(m.id);}})),
+    ...S.notes.map(n => ({name:n.id, kind:'Memory', run:()=>{if(graphMode==='team')document.querySelector('[data-lens="all"]').click();openWorkspaceNote(n.id);}})),
+    ...['team','skills','jev','memory','models','tasks'].map(id=>({name:id[0].toUpperCase()+id.slice(1),kind:'Settings',run:()=>openPanel(id)}))
+  ].filter(x=>(x.name+' '+x.kind).toLowerCase().includes(q));
+  $('command-results').replaceChildren();
+  for (const item of items) { const b=document.createElement('button');b.type='button';
+    const name=document.createElement('span');name.textContent=item.name;const kind=document.createElement('small');kind.textContent=item.kind;b.append(name,kind);
+    b.onclick=()=>{commandDialog.close();item.run();};$('command-results').append(b); }
+  if(!items.length) $('command-results').textContent='No matches. Try a teammate or note title.';
+}
+$('command-btn').onclick=()=>{searchCommands();commandDialog.showModal();$('command-search').focus();};
+$('command-close').onclick=()=>commandDialog.close();
+$('command-search').oninput=searchCommands;
+commandDialog.addEventListener('keydown',e=>{const buttons=[...$('command-results').querySelectorAll('button')];const i=buttons.indexOf(document.activeElement);
+  if(e.key==='ArrowDown'||e.key==='ArrowUp'){e.preventDefault();buttons[(i+(e.key==='ArrowDown'?1:-1)+buttons.length)%buttons.length]?.focus();}
+  if(e.key==='Enter'&&document.activeElement===$('command-search')){e.preventDefault();buttons[0]?.click();}});
+document.addEventListener('keydown',e=>{if((e.metaKey||e.ctrlKey)&&e.key.toLowerCase()==='k'){e.preventDefault();if(commandDialog.open)commandDialog.close();else $('command-btn').click();}
+  if(e.key==='Escape')$('app').classList.remove('side-open');});
+$('side-close').onclick=()=>{$('app').classList.remove('side-open');if(matchMedia('(max-width:760px)').matches)document.querySelector('.mtabs button[data-m="chat"]').click();};
+$('explore-team').onclick=()=>{$('command-search').value='Team';$('command-btn').click();};
+$('explore-memory').onclick=()=>{$('command-search').value='Memory';$('command-btn').click();};
+$('graph-reset').onclick=()=>brain.reset();
+$('signal-demo').onclick=()=>{for(const m of S.members)brain.pulse(hubId(),m.id,m.color);brain.burst(hubId());};
+
+document.querySelectorAll('[data-panel]').forEach(b=>b.onclick=()=>openPanel(b.dataset.panel));
+$('focus-mode').onclick=()=>{const on=$('app').classList.toggle('zen');$('focus-mode').setAttribute('aria-pressed',String(on));requestAnimationFrame(()=>brain.fit());};
+$('rail-graph').onclick=()=>{$('app').classList.remove('side-open');brain.fit();};
+document.querySelectorAll('[data-lens]').forEach(b=>b.onclick=()=>{graphMode=b.dataset.lens;document.querySelectorAll('[data-lens]').forEach(x=>x.setAttribute('aria-pressed',String(x===b)));graph();requestAnimationFrame(()=>brain.fit());});
+/* ---------- load ---------- */
+renderAll();
+function aiPill() { const on = !!sample || gwOn(); $("ai-dot").className = "dot " + (on ? "on" : "warn");
+  $("ai-txt").textContent = sample && gwOn() ? "Claude + Firefly" : sample ? "Claude" : gwOn() ? "Firefly" : "off"; }
+async function gwStatus() {
+  if (!gwOn()) { GW.status = null; renderModels(); return; }
+  try { const r = await fetch(GW.url.replace(/\/$/, "") + "/api/status", {headers: {Authorization: "Bearer " + GW.pass}});
+    GW.status = r.ok ? await r.json() : {error: r.status === 401 ? "Wrong passcode." : r.status === 503 ? "The server has no passcode set yet." : "Couldn't reach the server (" + r.status + ")."}; }
+  catch (e) { GW.status = {error: "Couldn't reach the Firefly server" + (GW.url ? " at " + GW.url : "") + "."}; }
+  renderModels(); }
+sampleP.then((s) => { sample = s; aiPill(); });
+/* ---------- storage: Claude's own (inside Claude) or the Firefly server's database (on Cloudflare) ---------- */
+function attach() {
+  const live = (col, key, map) => db.collection(col).onSnapshot((snap) => { S[key] = snap.docs.map((d) => ({...d.data(), _id: d.id})); if (map) map(); renderAll(); }, () => {});
+  live("members", "members", () => S.members.sort((a, b) => (b.hub ? 1 : 0) - (a.hub ? 1 : 0) || (a.at || "").localeCompare(b.at || "")));
+  live("skills", "skills"); live("notes", "notes", () => S.notes.sort((a, b) => a.id === "Home" ? -1 : b.id === "Home" ? 1 : a.id.localeCompare(b.id)));
+  db.collection("tasks").orderBy("at", "desc").limit(200).onSnapshot((snap) => { S.tasks = snap.docs.map((d) => ({...d.data(), _id: d.id}));
+    const run = new Set(S.tasks.filter((t) => t.status === "waiting").map((t) => t.member)); $("work-txt").textContent = run.size ? run.size + " waiting" : "–"; renderAll(); }, () => {});
+  db.collection("usage").orderBy("at", "desc").limit(1000).onSnapshot((snap) => { S.usage = snap.docs.map((d) => d.data()); renderModels(); }, () => {});
+  db.collection("config").onSnapshot((snap) => { for (const d of snap.docs) { if (d.id === "jev") S.jev = d.data(); if (d.id === "project") S.project = {...S.project, ...d.data()}; } renderAll(); }, () => {});
+  db.collection("chat").orderBy("at", "desc").limit(150).get().then((snap) => talk.replaceLog(snap.docs.map((d) => d.data()).reverse())).catch(() => {});
+}
+const PROJECT_ID = /^[a-z0-9][a-z0-9-]{0,39}$/;
+function currentProject() { let p = "firefly"; try { p = localStorage.getItem("firefly-project") || p; } catch (e) { /* default */ } return PROJECT_ID.test(p) ? p : "firefly"; }
+function switchProject(id) { try { localStorage.setItem("firefly-project", id); } catch (e) { /* this visit only */ } location.reload(); }
+async function loadProjects() {
+  if (!S.server) return;
+  try { const r = await fetch(GW.url.replace(/\/$/, "") + "/api/projects", {headers: {Authorization: "Bearer " + GW.pass}});
+    if (r.ok) { S.projects = (await r.json()).projects || []; renderProjects(); } } catch (e) { /* list stays as it was */ }
+}
+function renderProjects() {
+  const el = $("proj"); if (!el) return; el.hidden = !S.server;
+  const list = [...(S.projects || [])]; if (!list.some((p) => p.id === S.projectId)) list.unshift({id: S.projectId, name: S.project.name || S.projectId});
+  el.innerHTML = list.map((p) => `<option value="${esc(p.id)}"${p.id === S.projectId ? " selected" : ""}>${esc(p.name || p.id)}</option>`).join("") + '<option value="+">+ New project…</option>';
+}
+$("proj").addEventListener("change", (e) => {
+  const v = e.target.value;
+  if (v !== "+") return switchProject(v);
+  const name = (prompt("Name of the new project?") || "").trim(); if (!name) { renderProjects(); return; }
+  const id = slug(name).slice(0, 40); if (!PROJECT_ID.test(id)) { renderProjects(); return; }
+  try { localStorage.setItem("firefly-new-name", name); } catch (x) { /* falls back to the id */ }
+  switchProject(id);
+});
+
+(async () => {
+  const claude = window.claude;
+  if (!claude?.use) {
+    let d = null; try { const r = await fetch("brain-data.json", {cache: "no-store"}); if (r.ok) d = await r.json(); } catch (e) { d = null; }
+    const pick = (x, y) => Array.isArray(x) && x.length ? x : y;
+    // The repo's team and vault are what a new project starts with.
+    STARTER.members = pick(d?.members, STARTER.members); STARTER.skills = pick(d?.skills, STARTER.skills); STARTER.notes = pick(d?.notes, STARTER.notes);
+    if (d?.jev) STARTER.jev = d.jev;
+    S.jev = STARTER.jev; loadAi(d?.ai); S.standalone = true; aiPill();
+    if (gwOn()) {
+      S.projectId = currentProject();
+      const store = Brain.store({url: GW.url, passcode: GW.pass, project: S.projectId, pollMs: 30000, onError: () => toast("A change didn't save: reloaded from the server.")});
+      try {
+        await store.ready(); db = store; S.server = true; S.canEdit = true;
+        const empty = (await db.collection("members").get()).empty;
+        if (empty) { let name = ""; try { name = localStorage.getItem("firefly-new-name") || ""; localStorage.removeItem("firefly-new-name"); } catch (e) { /* none */ }
+          await setupStarter(); await db.collection("config").doc("project").set({...S.project, name: name || (S.projectId === "firefly" ? "Firefly" : S.projectId)}); }
+        attach(); gwStatus(); loadProjects(); renderProjects(); return;
+      } catch (e) { GW.memoryError = e?.status === 401 ? "Wrong passcode." : e?.status === 503 ? "The server's memory isn't connected yet." : "Couldn't load this project from the server."; }
+    }
+    S.members = STARTER.members.map((m) => ({...m, _id: m.id})).sort((a, b) => (b.hub ? 1 : 0) - (a.hub ? 1 : 0));
+    S.skills = STARTER.skills.map((x) => ({...x, _id: x.id}));
+    S.notes = STARTER.notes.map((n) => ({...n, _id: slug(n.id)})).sort((a, b) => a.id === "Home" ? -1 : b.id === "Home" ? 1 : a.id.localeCompare(b.id));
+    S.canEdit = false;
+    try { talk.replaceLog(JSON.parse(localStorage.getItem("firefly-chat") || "[]")); } catch (e) { /* nothing saved */ }
+    gwStatus(); renderAll(); return; }
+  db = await claude.use("db");
+  const u = await claude.use("user").catch(() => null);
+  if (u) { const [owner, edit, id, me] = await Promise.all([u.isOwner(), u.canEdit(), u.id().catch(() => null), u.me().catch(() => null)]);
+    S.me = {owner: !!owner, id, name: me?.name || ""}; S.canEdit = !!(edit || owner); talk.setFrom({label: me?.name || "You"});
+    if (owner && me?.name) S.project.owner = me.name; }
+  if (!db) { S.canEdit = false; renderAll(); return; }
+  attach();
+})();
+})();
+</script>
+
+</body></html>

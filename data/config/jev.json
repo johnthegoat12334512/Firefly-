@@ -1,0 +1,98 @@
+{
+  "at": "2026-11-08T19:31:11.524Z",
+  "rules": [
+    {
+      "kind": "research",
+      "member": "researcher",
+      "words": [
+        "research",
+        "find",
+        "look up",
+        "trend",
+        "source",
+        "compare",
+        "competitor"
+      ]
+    },
+    {
+      "kind": "numbers",
+      "member": "analyst",
+      "words": [
+        "number",
+        "data",
+        "stat",
+        "measure",
+        "cost",
+        "price",
+        "average",
+        "test"
+      ]
+    },
+    {
+      "kind": "build",
+      "member": "builder",
+      "words": [
+        "build",
+        "code",
+        "fix",
+        "bug",
+        "page",
+        "script",
+        "app",
+        "tool"
+      ]
+    },
+    {
+      "kind": "write",
+      "member": "writer",
+      "words": [
+        "write",
+        "draft",
+        "copy",
+        "post",
+        "name",
+        "slogan",
+        "summar"
+      ]
+    },
+    {
+      "kind": "review",
+      "member": "critic",
+      "words": [
+        "review",
+        "critique",
+        "flaw",
+        "risk",
+        "weak",
+        "second opinion"
+      ]
+    },
+    {
+      "kind": "safety",
+      "member": "checker",
+      "words": [
+        "rule",
+        "legal",
+        "safe",
+        "privacy",
+        "policy",
+        "terms"
+      ]
+    }
+  ],
+  "sensitive": [
+    "money",
+    "pay",
+    "spend",
+    "budget",
+    "password",
+    "api key",
+    "private key",
+    "seed",
+    "wallet",
+    "sign",
+    "approve",
+    "delete",
+    "contract"
+  ]
+}

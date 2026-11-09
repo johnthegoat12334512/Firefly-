@@ -1,0 +1,85 @@
+{
+  "about": "AIs the Firefly server can use. id is provider:model. Cloudflare model names confirmed in Cloudflare's docs on 2026-11-08 (Hermes 2 Pro and Llama 3.1 8B are being retired). check:true means confirm the exact name in that provider's model list. Tiers are what members pick: easy = free first, hard = paid first (then free if no paid AI answers).",
+  "models": [
+    {
+      "id": "cloudflare:@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "name": "Llama 3.3 70B fast (Cloudflare)",
+      "cost": "free daily allowance, no key"
+    },
+    {
+      "id": "cloudflare:@cf/meta/llama-4-scout-17b-16e-instruct",
+      "name": "Llama 4 Scout (Cloudflare)",
+      "cost": "free daily allowance, no key"
+    },
+    {
+      "id": "cloudflare:@cf/openai/gpt-oss-20b",
+      "name": "gpt-oss 20B (Cloudflare)",
+      "cost": "free daily allowance, no key"
+    },
+    {
+      "id": "cloudflare:@hf/nousresearch/hermes-2-pro-mistral-7b",
+      "name": "Hermes 2 Pro (Cloudflare, being retired)",
+      "cost": "free, no key"
+    },
+    {
+      "id": "openrouter:nousresearch/hermes-3-llama-3.1-405b:free",
+      "name": "Hermes 3 405B (OpenRouter)",
+      "cost": "free, needs a free OpenRouter key",
+      "check": true
+    },
+    {
+      "id": "gemini:gemini-2.5-flash",
+      "name": "Gemini Flash",
+      "cost": "free daily allowance, needs a key",
+      "check": true
+    },
+    {
+      "id": "deepseek:deepseek-chat",
+      "name": "DeepSeek Chat",
+      "cost": "cheap, paid key",
+      "check": true
+    },
+    {
+      "id": "openai:gpt-4o-mini",
+      "name": "ChatGPT mini",
+      "cost": "cheap, paid key",
+      "check": true
+    },
+    {
+      "id": "anthropic:claude-haiku-5-5",
+      "name": "Claude Haiku 5.5 (API)",
+      "cost": "cheap, paid key"
+    },
+    {
+      "id": "anthropic:claude-sonnet-5-5",
+      "name": "Claude Sonnet 5.5 (API)",
+      "cost": "medium, paid key"
+    },
+    {
+      "id": "anthropic:claude-opus-5-5",
+      "name": "Claude Opus 5.5 (API)",
+      "cost": "expensive, paid key"
+    }
+  ],
+  "tiers": {
+    "easy": [
+      "cloudflare:@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+      "cloudflare:@cf/meta/llama-4-scout-17b-16e-instruct",
+      "openrouter:nousresearch/hermes-3-llama-3.1-405b:free",
+      "cloudflare:@cf/openai/gpt-oss-20b",
+      "gemini:gemini-2.5-flash",
+      "cloudflare:@hf/nousresearch/hermes-2-pro-mistral-7b"
+    ],
+    "hard": [
+      "anthropic:claude-sonnet-5-5",
+      "openai:gpt-4o-mini",
+      "deepseek:deepseek-chat",
+      "gemini:gemini-2.5-flash",
+      "cloudflare:@cf/meta/llama-3.3-70b-instruct-fp8-fast"
+    ]
+  },
+  "fallback": [
+    "cloudflare:@cf/meta/llama-3.3-70b-instruct-fp8-fast",
+    "cloudflare:@cf/meta/llama-4-scout-17b-16e-instruct"
+  ]
+}

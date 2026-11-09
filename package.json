@@ -1,0 +1,11 @@
+{
+  "name": "firefly",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "test": "node --no-warnings --test tests/*.test.mjs",
+    "check": "node scripts/build.mjs && node --no-warnings --test tests/*.test.mjs && npx --yes wrangler@4 deploy --dry-run --outdir .wrangler-dry",
+    "deploy": "node scripts/build.mjs && npx --yes wrangler@4 deploy"
+  }
+}

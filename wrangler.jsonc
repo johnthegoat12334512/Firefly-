@@ -1,0 +1,19 @@
+// Firefly on Cloudflare Workers. Keys are Cloudflare secrets (dashboard > Worker > Settings > Variables and Secrets),
+// never written here. The AI binding gives the free Cloudflare models (no key).
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "firefly",
+  "main": "server/worker.js",
+  "compatibility_date": "2026-10-01",
+  "assets": { "directory": "./site", "binding": "ASSETS" },
+  "ai": { "binding": "AI" },
+  // Firefly's memory: projects, team, notes, tasks, chat and AI usage.
+  "d1_databases": [{ "binding": "DB", "database_name": "firefly", "database_id": "5ba1d9bd-0ce6-4dec-8180-950f888f2096" }],
+  // Branch previews get the free AI but no database, so a test version can never touch real memory.
+  "previews": { "ai": { "binding": "AI" } },
+  // The kitchen: one Durable Object per project cooks orders on the server (free plan: SQLite-backed only).
+  "durable_objects": { "bindings": [{ "name": "KITCHEN", "class_name": "Kitchen" }] },
+  "migrations": [{ "tag": "v1", "new_sqlite_classes": ["Kitchen"] }],
+  "observability": { "enabled": true }
+  // Optional daily caps per AI: "vars": { "DAILY_LIMITS": "{\"anthropic\":100,\"openai\":100}" }
+}

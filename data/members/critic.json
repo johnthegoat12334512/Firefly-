@@ -1,0 +1,11 @@
+{
+  "at": "2026-11-08T19:31:11.524Z",
+  "color": "#ff7088",
+  "id": "critic",
+  "job": "Finds the flaws in any plan before it ships.",
+  "model": "tier:hard",
+  "name": "Critic",
+  "skills": [
+    "red-team"
+  ]
+}

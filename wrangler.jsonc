@@ -8,7 +8,7 @@
   "assets": { "directory": "./site", "binding": "ASSETS" },
   "ai": { "binding": "AI" },
   // Firefly's memory: projects, team, notes, tasks, chat and AI usage.
-  "d1_databases": [{ "binding": "DB", "database_name": "firefly", "database_id": "5ba1d9bd-0ce6-4dec-8180-950f888f2096" }],
+  "d1_databases": [{ "binding": "DB", "database_name": "firefly", "database_id": "78a4488d-e2f7-40a2-80bc-012f5ec369f3" }],
   // Branch previews get the free AI but no database, so a test version can never touch real memory.
   "previews": { "ai": { "binding": "AI" } },
   // The kitchen: one Durable Object per project cooks orders on the server (free plan: SQLite-backed only).
